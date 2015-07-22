@@ -5,6 +5,55 @@
 
 > coroutine  - 像golang一样好用的协程库
 
+~~~~~~~~~~cpp
+#include "coroutine.h"
+#include <iostream>
+#include <unistd.h>
+using namespace std;
+
+void f2()
+{
+    cout << 2 << endl;
+    yield;
+    cout << 4 << endl;
+    yield;
+    cout << 6 << endl;
+}
+
+void f1()
+{
+    go f2;
+    cout << 1 << endl;
+    yield;
+    cout << 3 << endl;
+    yield;
+    cout << 5 << endl;
+}
+
+int main()
+{
+    go f1;
+    cout << "go" << endl;
+    while (!g_Scheduler.IsEmpty()) {
+        g_Scheduler.Run();
+    }
+    cout << "end" << endl;
+    return 0;
+}
+~~~~~~~~~~
+
+~~~~~~~~~~cpp
+// 输出结果
+go
+1
+2
+3
+4
+5
+6
+end
+~~~~~~~~~~
+
 > multiret   - 让C++支持多返回值
 
 ~~~~~~~~~~cpp
