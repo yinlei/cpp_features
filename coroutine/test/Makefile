@@ -6,7 +6,7 @@ OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	$(CC) $(CFLAGS) $^ -L.. -lcoroutine -o $@ -Wl,--no-as-needed -lpthread
+	$(CC) $(CFLAGS) $^ -L.. -lcoroutine -o $@ -lboost_system
 	echo "LD $(TARGET)"
 
 .cpp.o:

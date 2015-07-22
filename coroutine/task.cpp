@@ -11,11 +11,9 @@ static void C_func(Task* self)
     Scheduler::getInstance().Yield();
 }
 
-Task::Task(TaskF const& fn)
-    : id_(++s_id), state_(TaskState::runnable),
-    fn_(fn)
+Task::Task(TaskF const& fn, int stack_size)
+    : id_(++s_id), state_(TaskState::runnable), fn_(fn)
 {
-    const int stack_size = 128 * 1024;
     stack_ = new char[stack_size];
     if (0 == getcontext(&ctx_)) {
         ctx_.uc_stack.ss_sp = stack_;
@@ -24,12 +22,9 @@ Task::Task(TaskF const& fn)
         makecontext(&ctx_, (void(*)(void))&C_func,
                 1, this);
     }
-
-//    std::cout << "Task()" << std::endl;
 }
 
 Task::~Task()
 {
     delete []stack_;
-//    std::cout << "~Task()" << std::endl;
 }

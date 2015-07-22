@@ -6,12 +6,12 @@ OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
 all : $(TARGET)
 
 $(TARGET) : $(OBJS)
-	ar cr $@ $^
-	echo "LD $(TARGET)"
+	@ar cr $@ $^
+	@echo "LD $(TARGET)"
 
 .cpp.o:
-	$(CC) $(CFLAGS) -c $^ -o $@
-	echo "MK $@"
+	@$(CC) $(CFLAGS) -c $^ -o $@
+	@echo "CC $@"
 
 .PHONY: clean
 
