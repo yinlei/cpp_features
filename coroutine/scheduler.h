@@ -21,7 +21,7 @@ struct ThreadLocalInfo
 class Scheduler : boost::noncopyable
 {
     public:
-        typedef list<Task, constant_time_size<false>> TaskList;
+        typedef list<Task> TaskList;
 
         static Scheduler& getInstance();
 

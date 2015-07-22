@@ -17,7 +17,7 @@ typedef std::function<void()> TaskF;
 using namespace boost::intrusive;
 
 struct Task
-    : public list_base_hook<link_mode<auto_unlink>>
+    : public list_base_hook<>
 {
     uint64_t id_;
     TaskState state_;

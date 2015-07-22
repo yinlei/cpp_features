@@ -80,8 +80,8 @@ void Scheduler::Run()
 
             case TaskState::io_block:
             case TaskState::sync_block:
-                wait_task_->push_back(*tk);
                 it = run_task_->erase(it);
+                wait_task_->push_back(*tk);
                 break;
 
             case TaskState::done:
