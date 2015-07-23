@@ -23,10 +23,8 @@ std::pair<int, double> foo4() {
 
 int main()
 {
-    //cout << boolalpha;
-    //cout << multi_ret::mr<bool>::is_container<std::vector<int>>::value << endl;
-
-    int a = 0, b = 0, c = 0;
+    int a = 0, b = 0;
+    double c = 0;
     MR(a, b, c) = foo();
     cout << a << b << c << endl;
 
