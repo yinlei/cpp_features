@@ -24,6 +24,7 @@ void f1()
 
 int main()
 {
+//    g_Scheduler.GetOptions().debug = true;
     go f1;
     cout << "go" << endl;
     while (!g_Scheduler.IsEmpty()) {

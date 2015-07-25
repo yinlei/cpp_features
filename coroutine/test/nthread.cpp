@@ -22,7 +22,7 @@ void f1()
 
 int main()
 {
-    //g_Scheduler.GetOptions().debug = true;
+//    g_Scheduler.GetOptions().debug = true;
     g_Scheduler.GetOptions().stack_size = 2048;
 
     for (int i = 0; i < co_count; ++i) {

@@ -6,10 +6,10 @@
 
 struct CoroutineOptions
 {
-    uint32_t stack_size;
-    bool debug;
-
-    CoroutineOptions();
+    bool debug = false;
+    uint32_t stack_size = 128 * 1024;
+    uint32_t chunk_count = 128;     // Run每次最多从run队列中pop出1/chunk_count * task_count个task.
+    uint32_t max_chunk_size = 128;  // Run每次最多从run队列中pop出max_chunk_size个task.
 };
 
 struct ThreadLocalInfo
@@ -50,6 +50,8 @@ class Scheduler : boost::noncopyable
         TaskList wait_task_;
         int epoll_fd;
         std::atomic<uint32_t> task_count_;
+        std::atomic<uint32_t> runnale_task_count_;
 };
 
 #define g_Scheduler Scheduler::getInstance()
+
