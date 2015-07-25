@@ -83,7 +83,6 @@ void do_redis(int num)
         return ;
     }
 
-    printf("[%d] got reply.\n", num);
     std::shared_ptr<redisReply> _ep_reply(reply, [](redisReply* reply){ freeReplyObject(reply); });
 
     if (!(reply->type == REDIS_REPLY_STATUS && strcasecmp(reply->str,"OK")==0)) {
@@ -112,9 +111,7 @@ int main()
 go
 [0] connected redis.
 [1] connected redis.
-[0] got reply.
 [0] execute command success.
-[1] got reply.
 [1] execute command success.
 end
 ~~~~~~~~~~
