@@ -11,6 +11,7 @@ Scheduler& Scheduler::getInstance()
     return obj;
 }
 
+extern void coroutine_hook_init();
 Scheduler::Scheduler()
 {
     epoll_fd_ = epoll_create(1024);
@@ -18,6 +19,8 @@ Scheduler::Scheduler()
         perror("CoroutineScheduler init failed. epoll create error:");
         assert(false);
     }
+
+    coroutine_hook_init();
 }
 
 Scheduler::~Scheduler()

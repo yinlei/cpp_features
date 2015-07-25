@@ -19,6 +19,8 @@ static write_t write_f = (write_t)dlsym(RTLD_NEXT, "write");
 typedef ssize_t(*writev_t)(int, const struct iovec *, int);
 static writev_t writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
 
+extern "C" {
+
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     DebugPrint("hook connect. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
@@ -181,3 +183,7 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
         return s;
     }
 }
+
+}
+
+void coroutine_hook_init() {}
