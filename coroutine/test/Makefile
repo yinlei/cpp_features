@@ -1,12 +1,13 @@
 CC=g++
 CFLAGS=-std=c++11 -g -Wall
-TARGET=test_coroutine
-OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
+TARGET=simple.t nthread.t 1thread.t
+#OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
+OBJS=$(patsubst %, %.o, $(TARGET))
 
 all : $(TARGET)
 
-$(TARGET) : $(OBJS)
-	$(CC) $(CFLAGS) $^ -L.. -lcoroutine -o $@ -lboost_system
+%.t: %.o
+	$(CC) $(CFLAGS) $^ -L.. -lcoroutine -o $@ -lboost_system -lboost_thread
 	echo "LD $(TARGET)"
 
 .cpp.o:

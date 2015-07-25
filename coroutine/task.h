@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <ucontext.h>
 #include <functional>
-#include <boost/intrusive/list_hook.hpp>
+#include "ts_queue.h"
 
 enum class TaskState
 {
@@ -14,10 +14,8 @@ enum class TaskState
 
 typedef std::function<void()> TaskF;
 
-using namespace boost::intrusive;
-
 struct Task
-    : public list_base_hook<>
+    : public TSQueueHook
 {
     uint64_t id_;
     TaskState state_;

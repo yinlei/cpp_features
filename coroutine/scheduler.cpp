@@ -1,10 +1,15 @@
 #include "scheduler.h"
 #include <ucontext.h>
 #include <assert.h>
+#include <sys/epoll.h>
+#include <stdio.h>
+
+#define Debug(...) do{ if (g_Scheduler.GetOptions().debug) { printf(__VA_ARGS__); printf("\n"); } }while(0)
 
 CoroutineOptions::CoroutineOptions()
 {
     stack_size = 128 * 1024;
+    debug = false;
 }
 
 Scheduler& Scheduler::getInstance()
@@ -15,9 +20,11 @@ Scheduler& Scheduler::getInstance()
 
 Scheduler::Scheduler()
 {
-    run_task_ = &task_lists_[0];
-    run2_task_ = &task_lists_[0];
-    wait_task_ = &task_lists_[0];
+    epoll_fd = epoll_create(1024);
+    if (epoll_fd == -1) {
+        perror("CoroutineScheduler init failed. epoll create error:");
+        assert(false);
+    }
 }
 
 Scheduler::~Scheduler()
@@ -39,6 +46,7 @@ CoroutineOptions& Scheduler::GetOptions()
 void Scheduler::CreateTask(TaskF const& fn)
 {
     Task* tk = new Task(fn, GetOptions().stack_size);
+    ++task_count_;
     AddTask(tk);
 }
 
@@ -49,7 +57,7 @@ bool Scheduler::IsCoroutine()
 
 bool Scheduler::IsEmpty()
 {
-    return task_lists_[0].empty() && task_lists_[1].empty() && task_lists_[2].empty();
+    return task_count_ == 0;
 }
 
 void Scheduler::Yield()
@@ -57,49 +65,59 @@ void Scheduler::Yield()
     Task* tk = GetLocalInfo().current_task;
     if (!tk) return ;
 
+    Debug("yield task(%llu) state=%d", tk->id_, tk->state_);
     swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
 }
 
-void Scheduler::Run()
+uint32_t Scheduler::Run()
 {
     ThreadLocalInfo& info = GetLocalInfo();
     info.current_task = NULL;
+    uint32_t do_count = 0;
 
-    TaskList::iterator it = run_task_->begin();
-    while (it != run_task_->end())
+    Task *tk = NULL;
+    while ((tk = run_task_.pop()))
     {
-        Task* tk = &*it;
         info.current_task = tk;
+        Debug("enter task(%llu)", tk->id_);
         swapcontext(&info.scheduler, &tk->ctx_);
+        ++do_count;
+        Debug("exit task(%llu) state=%d", tk->id_, tk->state_);
         info.current_task = NULL;
 
         switch (tk->state_) {
             case TaskState::runnable:
-                ++it;
+                AddTask(tk);
                 break;
 
             case TaskState::io_block:
             case TaskState::sync_block:
-                it = run_task_->erase(it);
-                wait_task_->push_back(*tk);
+                wait_task_.push(tk);
                 break;
 
             case TaskState::done:
             default:
-                it = run_task_->erase(it);
+                --task_count_;
                 delete tk;
                 break;
         }
     }
 
+    static thread_local epoll_event evs[1024];
+    int n = epoll_wait(epoll_fd, evs, 1024, 1);
+    for (int i = 0; i < n; ++i)
     {
-        boost::mutex::scoped_lock lck(run2_mutex);
-        std::swap(run_task_, run2_task_);
+        Task* tk = (Task*)evs[i].data.ptr;
+        if (tk->unlink())
+            AddTask(tk);
     }
+
+    return do_count;
 }
 
 void Scheduler::AddTask(Task* tk)
 {
-    boost::mutex::scoped_lock lck(run2_mutex);
-    run2_task_->push_back(*tk);
+    Debug("Add task(%llu) to runnable list.", tk->id_);
+    run_task_.push(tk);
 }
+

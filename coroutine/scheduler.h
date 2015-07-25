@@ -1,13 +1,13 @@
 #pragma once
 #include <ucontext.h>
 #include <boost/noncopyable.hpp>
-#include <boost/intrusive/list.hpp>
 #include <boost/thread/mutex.hpp>
 #include "task.h"
 
 struct CoroutineOptions
 {
     uint32_t stack_size;
+    bool debug;
 
     CoroutineOptions();
 };
@@ -21,11 +21,9 @@ struct ThreadLocalInfo
 class Scheduler : boost::noncopyable
 {
     public:
-        typedef list<Task> TaskList;
+        typedef TSQueue<Task> TaskList;
 
         static Scheduler& getInstance();
-
-        ThreadLocalInfo& GetLocalInfo();
 
         CoroutineOptions& GetOptions();
 
@@ -37,7 +35,7 @@ class Scheduler : boost::noncopyable
 
         void Yield();
 
-        void Run();
+        uint32_t Run();
 
     private:
         Scheduler();
@@ -45,12 +43,13 @@ class Scheduler : boost::noncopyable
 
         void AddTask(Task* tk);
 
+        ThreadLocalInfo& GetLocalInfo();
+
         // list of task.
-        TaskList task_lists_[3];
-        TaskList *run_task_;
-        TaskList *run2_task_;
-        TaskList *wait_task_;
-        boost::mutex run2_mutex;
+        TaskList run_task_;
+        TaskList wait_task_;
+        int epoll_fd;
+        std::atomic<uint32_t> task_count_;
 };
 
 #define g_Scheduler Scheduler::getInstance()
