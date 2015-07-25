@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <sys/epoll.h>
 #include <stdio.h>
+#include <system_error>
 
 Scheduler& Scheduler::getInstance()
 {
@@ -38,6 +39,13 @@ CoroutineOptions& Scheduler::GetOptions()
 void Scheduler::CreateTask(TaskF const& fn)
 {
     Task* tk = new Task(fn, GetOptions().stack_size);
+    if (tk->state_ == TaskState::fatal) {
+        // 创建失败
+        delete tk;
+        throw std::system_error(errno, std::system_category());
+        return ;
+    }
+
     ++task_count_;
     AddTask(tk);
 }
@@ -58,7 +66,9 @@ void Scheduler::Yield()
     if (!tk) return ;
 
     DebugPrint("yield task(%llu) state=%d", tk->id_, tk->state_);
-    swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
+    int ret = swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
+    if (ret) perror("swapcontext error:");
+    assert(ret == 0);
 }
 
 uint32_t Scheduler::Run()
@@ -88,7 +98,9 @@ uint32_t Scheduler::Run()
             Task* tk = &*it;
             info.current_task = tk;
             DebugPrint("enter task(%llu)", tk->id_);
-            swapcontext(&info.scheduler, &tk->ctx_);
+            int ret = swapcontext(&info.scheduler, &tk->ctx_);
+            if (ret) perror("swapcontext error:");
+            assert(ret == 0);
             ++do_count;
             DebugPrint("exit task(%llu) state=%d", tk->id_, tk->state_);
             info.current_task = NULL;

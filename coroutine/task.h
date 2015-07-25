@@ -7,9 +7,10 @@
 enum class TaskState
 {
     runnable,
-    io_block,    // write, writev, read, ...
+    io_block,    // write, writev, read, select, poll, ...
     sync_block,  // mutex, pthread_lock, ...
     done,
+    fatal,
 };
 
 typedef std::function<void()> TaskF;

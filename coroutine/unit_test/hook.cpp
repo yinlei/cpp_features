@@ -29,7 +29,7 @@ void foo()
 
 int main()
 {
-    g_Scheduler.GetOptions().debug = true;
+//    g_Scheduler.GetOptions().debug = true;
     go foo;
     cout << "go" << endl;
     while (!g_Scheduler.IsEmpty())
