@@ -26,7 +26,7 @@ void do_redis(int num)
         return ;
     }
 
-    printf("[%d] got reply.\n", num);
+//    printf("[%d] got reply.\n", num);
     std::shared_ptr<redisReply> _ep_reply(reply, [](redisReply* reply){ freeReplyObject(reply); });
 
     if (!(reply->type == REDIS_REPLY_STATUS && strcasecmp(reply->str,"OK")==0)) {
@@ -40,7 +40,7 @@ void do_redis(int num)
 int main()
 {
 //    g_Scheduler.GetOptions().debug = true;
-    for (int i = 0; i < 10; ++i)
+    for (int i = 0; i < 2; ++i)
     {
         go [=]{ do_redis(i); };
     }
