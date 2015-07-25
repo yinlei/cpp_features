@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -g -Wall
-TARGET=simple.t nthread.t 1thread.t
+TARGET=simple.t nthread.t 1thread.t sleep.t
 #OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
 OBJS=$(patsubst %, %.o, $(TARGET))
 
