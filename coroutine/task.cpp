@@ -12,7 +12,7 @@ static void C_func(Task* self)
 }
 
 Task::Task(TaskF const& fn, int stack_size)
-    : id_(++s_id), state_(TaskState::runnable), fn_(fn)
+    : id_(++s_id), state_(TaskState::runnable), fn_(fn), wait_fd_(-1)
 {
     stack_ = new char[stack_size];
     if (0 == getcontext(&ctx_)) {

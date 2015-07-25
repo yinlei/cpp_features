@@ -22,6 +22,7 @@ struct Task
     ucontext_t ctx_;
     TaskF fn_;
     char* stack_;
+    int wait_fd_;
 
     explicit Task(TaskF const& fn, int stack_size);
     ~Task();

@@ -2,6 +2,7 @@
 #include <atomic>
 #include <mutex>
 #include <boost/operators.hpp>
+#include <assert.h>
 
 struct LFLock
 {
@@ -27,18 +28,7 @@ struct TSQueueHook
 {
     TSQueueHook *prev = NULL;
     TSQueueHook *next = NULL;
-    LFLock lck;
-    LFLock *list_lck;
-    bool unlink()
-    {
-        if ((!prev && !next) || !list_lck) return false;
-        std::lock_guard<LFLock> lkg(*list_lck);
-        if (prev) prev->next = next;
-        if (next) next->prev = prev;
-        prev = next = NULL;
-        list_lck = NULL;
-        return true;
-    }
+    void *check_ = NULL;
 };
 
 template <typename T>
@@ -131,7 +121,7 @@ public:
         tail_->next = hook;
         hook->prev = tail_;
         hook->next = NULL;
-        hook->list_lck = &lck;
+        hook->check_ = this;
         tail_ = hook;
     }
 
@@ -145,7 +135,7 @@ public:
         head_->next = ptr->next;
         if (ptr->next) ptr->next->prev = head_;
         ptr->prev = ptr->next = NULL;
-        ptr->list_lck = NULL;
+        ptr->check_ = NULL;
         return (T*)ptr;
     }
 
@@ -174,6 +164,16 @@ public:
         if (last->next) last->next->prev = head_;
         first->prev = last->next = NULL;
         return SList<T>(first, last, this);
+    }
+
+    void erase(TSQueueHook* hook)
+    {
+        assert(hook->check_ == (void*)this);
+        if (hook->prev) hook->prev->next = hook->next;
+        if (hook->next) hook->next->prev = hook->prev;
+        else if (hook == tail_) tail_ = tail_->prev;
+        hook->prev = hook->next = NULL;
+        hook->check_ = NULL;
     }
 };
 

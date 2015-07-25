@@ -4,6 +4,9 @@
 #include <boost/thread/mutex.hpp>
 #include "task.h"
 
+#define DebugPrint(fmt, ...) \
+    do{ if (g_Scheduler.GetOptions().debug) { printf(fmt "\n", ##__VA_ARGS__); } }while(0)
+
 struct CoroutineOptions
 {
     bool debug = false;
@@ -36,6 +39,17 @@ class Scheduler : boost::noncopyable
         void Yield();
 
         uint32_t Run();
+        
+        void RunLoop();
+
+        uint32_t TaskCount();
+
+        uint32_t RunnableTaskCount();
+
+        uint64_t GetCurrentTaskID();
+
+    public:
+        bool IOBlockSwitch(int fd, uint32_t event);
 
     private:
         Scheduler();
@@ -46,11 +60,11 @@ class Scheduler : boost::noncopyable
         ThreadLocalInfo& GetLocalInfo();
 
         // list of task.
-        TaskList run_task_;
-        TaskList wait_task_;
-        int epoll_fd;
+        TaskList run_tasks_;
+        TaskList wait_tasks_;
+        int epoll_fd_;
         std::atomic<uint32_t> task_count_;
-        std::atomic<uint32_t> runnale_task_count_;
+        std::atomic<uint32_t> runnable_task_count_;
 };
 
 #define g_Scheduler Scheduler::getInstance()
