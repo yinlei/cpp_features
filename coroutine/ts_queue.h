@@ -24,6 +24,12 @@ struct LFLock
     }
 };
 
+struct fake_lock_guard
+{
+    template <typename Mutex>
+    explicit fake_lock_guard(Mutex&) {}
+};
+
 struct TSQueueHook
 {
     TSQueueHook *prev = NULL;
@@ -84,10 +90,13 @@ public:
     inline bool check(void *c) { return check_ == c; }
 };
 
-template <typename T>
+template <typename T, bool ThreadSafe = true>
 class TSQueue
 {
     LFLock lck;
+    typedef typename std::conditional<ThreadSafe,
+            std::lock_guard<LFLock>,
+            fake_lock_guard>::type LockGuard;
     TSQueueHook* head_;
     TSQueueHook* tail_;
 
@@ -99,7 +108,7 @@ public:
 
     ~TSQueue()
     {
-        std::lock_guard<LFLock> lock(lck);
+        LockGuard lock(lck);
         while (head_ != tail_) {
             TSQueueHook *prev = tail_->prev;
             delete (T*)tail_;
@@ -111,12 +120,13 @@ public:
 
     bool empty()
     {
+        LockGuard lock(lck);
         return head_ == tail_;
     }
 
     void push(T* element)
     {
-        std::lock_guard<LFLock> lock(lck);
+        LockGuard lock(lck);
         TSQueueHook *hook = static_cast<TSQueueHook*>(element);
         tail_->next = hook;
         hook->prev = tail_;
@@ -128,7 +138,7 @@ public:
     T* pop()
     {
         if (head_ == tail_) return NULL;
-        std::lock_guard<LFLock> lock(lck);
+        LockGuard lock(lck);
         if (head_ == tail_) return NULL;
         TSQueueHook* ptr = head_->next;
         if (ptr == tail_) tail_ = head_;
@@ -143,21 +153,21 @@ public:
     {
         assert(elements.check(this));
         if (elements.empty()) return ;
-        std::lock_guard<LFLock> lock(lck);
+        LockGuard lock(lck);
         tail_->next = elements.head();
         elements.head()->prev = tail_;
         elements.tail()->next = NULL;
         tail_ = elements.tail();
     }
 
-    SList<T> pop(int n)
+    SList<T> pop(uint32_t n)
     {
         if (head_ == tail_) return SList<T>();
-        std::lock_guard<LFLock> lock(lck);
+        LockGuard lock(lck);
         if (head_ == tail_) return SList<T>();
         TSQueueHook* first = head_->next;
         TSQueueHook* last = first;
-        for (int i = 1; i < n && last->next; ++i)
+        for (uint32_t i = 1; i < n && last->next; ++i)
             last = last->next;
         if (last == tail_) tail_ = head_;
         head_->next = last->next;
@@ -169,6 +179,7 @@ public:
     void erase(TSQueueHook* hook)
     {
         assert(hook->check_ == (void*)this);
+        LockGuard lock(lck);
         if (hook->prev) hook->prev->next = hook->next;
         if (hook->next) hook->next->prev = hook->prev;
         else if (hook == tail_) tail_ = tail_->prev;

@@ -7,7 +7,7 @@
 using namespace std;
 
 std::atomic_int g_value{0};
-static const int co_count = 1000;
+static const int co_count = 100;
 static const int switch_per_co = 10;
 static int thread_count = 1;
 

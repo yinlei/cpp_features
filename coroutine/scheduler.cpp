@@ -102,6 +102,7 @@ uint32_t Scheduler::Run()
         {
             Task* tk = &*it;
             info.current_task = tk;
+            tk->state_ = TaskState::runnable;
             DebugPrint(dbg_co_switch, "enter task(%llu)", tk->id_);
             int ret = swapcontext(&info.scheduler, &tk->ctx_);
             if (ret) perror("swapcontext error:");
@@ -116,10 +117,19 @@ uint32_t Scheduler::Run()
                     break;
 
                 case TaskState::io_block:
-                case TaskState::sync_block:
                     --runnable_task_count_;
                     it = slist.erase(it);
                     wait_tasks_.push(tk);
+                    break;
+
+                case TaskState::sys_block:
+                case TaskState::user_block:
+                    {
+                        --runnable_task_count_;
+                        it = slist.erase(it);
+                        std::lock_guard<LFLock> lock(user_wait_lock_);
+                        user_wait_tasks_[tk->user_wait_type_][tk->user_wait_id_].push(tk);
+                    }
                     break;
 
                 case TaskState::done:
@@ -182,10 +192,10 @@ uint64_t Scheduler::GetCurrentTaskID()
 
 bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
-    // TODO: 同一个fd在不同线程同时进行read和write的处理.
+    // TODO: 支持同一个fd被多个协程等待
     if (!IsCoroutine()) return false;
     Task* tk = GetLocalInfo().current_task;
-    epoll_event ev = {event, tk};
+    epoll_event ev = {event, {(void*)tk}};
     if (-1 == epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd, &ev)) {
         fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
         return false;
@@ -198,4 +208,79 @@ bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
     return true;
 }
 
+bool Scheduler::UserBlockSwitch(uint32_t type, uint64_t wait_id, bool yield_immediately)
+{
+    return SysBlockSwitch((int64_t)type, wait_id, yield_immediately);
+}
+
+uint32_t Scheduler::UserBlockWeak(uint32_t type, uint64_t wait_id, uint32_t weak_count)
+{
+    return SysBlockWeak((int64_t)type, wait_id, weak_count);
+}
+
+void Scheduler::UserBlockCancel()
+{
+    SysBlockCancel();
+}
+
+bool Scheduler::SysBlockSwitch(int64_t type, uint64_t wait_id, bool yield_immediately)
+{
+    if (!IsCoroutine()) return false;
+    Task* tk = GetLocalInfo().current_task;
+    tk->user_wait_type_ = type;
+    tk->user_wait_id_ = wait_id;
+    tk->state_ = type < 0 ? TaskState::sys_block : TaskState::user_block;
+    DebugPrint(dbg_userblock, "task(%llu) %s. wait_type=%lld, wait_id=%llu, yield_immediately=%s",
+            tk->id_, type < 0 ? "sys_block" : "user_block", tk->user_wait_type_, tk->user_wait_id_,
+            yield_immediately ? "true" : "false");
+    if (yield_immediately)
+        Yield();
+    return true;
+}
+
+uint32_t Scheduler::SysBlockWeak(int64_t type, uint64_t wait_id, uint32_t weak_count)
+{
+    std::unique_lock<LFLock> locker(user_wait_lock_);
+    auto it = user_wait_tasks_.find(type);
+    if (it == user_wait_tasks_.end()) return 0;
+
+    auto it2 = it->second.find(wait_id);
+    if (it2 == it->second.end()) return 0;
+
+    auto& task_queue = it2->second;
+    SList<Task> tasks = task_queue.pop(weak_count);
+    if (task_queue.empty()) {
+        if (it->second.size() > 1) {
+            it->second.erase(wait_id);
+        } else {
+            user_wait_tasks_.erase(type);
+        }
+    }
+    locker.unlock();
+    std::size_t c = 0;
+    for (auto &task: tasks)
+    {
+        ++c;
+        Task *tk = &task;
+        DebugPrint(dbg_userblock, "%s weak task(%llu). wait_type=%lld, wait_id=%llu",
+                type < 0 ? "sys_block" : "user_block", tk->id_, type, wait_id);
+        AddTask(tk);
+    }
+    DebugPrint(dbg_userblock, "%s weak %u tasks. wait_type=%lld, wait_id=%llu",
+            type < 0 ? "sys_block" : "user_block", c, type, wait_id);
+    return c;
+}
+
+void Scheduler::SysBlockCancel()
+{
+    if (!IsCoroutine()) return ;
+    Task* tk = GetLocalInfo().current_task;
+    if (tk->state_ != TaskState::sys_block && tk->state_ != TaskState::io_block) return ;
+    DebugPrint(dbg_userblock, "task(%llu) cancel %s. wait_type=%lld, wait_id=%llu",
+            tk->id_, tk->user_wait_type_ < 0 ? "sys_block" : "user_block", tk->user_wait_type_,
+            tk->user_wait_id_);
+    tk->user_wait_type_ = (int64_t)SysBlockType::sysblock_none;
+    tk->user_wait_id_ = 0;
+    tk->state_ = TaskState::runnable;
+}
 

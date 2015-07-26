@@ -8,7 +8,8 @@ enum class TaskState
 {
     runnable,
     io_block,    // write, writev, read, select, poll, ...
-    sync_block,  // mutex, pthread_lock, ...
+    sys_block,  // mutex, pthread_lock, ...
+    user_block,  // mutex, pthread_lock, ...
     done,
     fatal,
 };
@@ -24,6 +25,8 @@ struct Task
     TaskF fn_;
     char* stack_;
     int wait_fd_;
+    int64_t user_wait_type_;
+    uint64_t user_wait_id_;
 
     explicit Task(TaskF const& fn, int stack_size);
     ~Task();
