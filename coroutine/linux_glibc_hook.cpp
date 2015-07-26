@@ -4,21 +4,6 @@
 #include <sys/socket.h>
 #include "scheduler.h"
 
-typedef int(*connect_t)(int, const struct sockaddr *, socklen_t);
-static connect_t connect_f = (connect_t)dlsym(RTLD_NEXT, "connect");
-
-typedef ssize_t(*read_t)(int, void *, size_t);
-static read_t read_f = (read_t)dlsym(RTLD_NEXT, "read");
-
-typedef ssize_t(*readv_t)(int, const struct iovec *, int);
-static readv_t readv_f = (readv_t)dlsym(RTLD_NEXT, "readv");
-
-typedef ssize_t(*write_t)(int, const void *, size_t);
-static write_t write_f = (write_t)dlsym(RTLD_NEXT, "write");
-
-typedef ssize_t(*writev_t)(int, const struct iovec *, int);
-static writev_t writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
-
 template <typename OriginF, typename ... Args>
 ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, Args && ... args)
 {
@@ -44,6 +29,9 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
             
             DebugPrint("continue task(%llu) %s. fd=%d", g_Scheduler.GetCurrentTaskID(), hook_fn_name, fd);
             n = fn(fd, std::forward<Args>(args)...);
+        } else {
+            DebugPrint("task(%llu) syscall(%s) completed immediately. fd=%d",
+                    g_Scheduler.GetCurrentTaskID(), hook_fn_name, fd);
         }
 
         int e = errno;
@@ -54,6 +42,21 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
 }
 
 extern "C" {
+
+typedef int(*connect_t)(int, const struct sockaddr *, socklen_t);
+static connect_t connect_f = NULL;
+
+typedef ssize_t(*read_t)(int, void *, size_t);
+static read_t read_f = NULL;
+
+typedef ssize_t(*readv_t)(int, const struct iovec *, int);
+static readv_t readv_f = NULL;
+
+typedef ssize_t(*write_t)(int, const void *, size_t);
+static write_t write_f = NULL;
+
+typedef ssize_t(*writev_t)(int, const struct iovec *, int);
+static writev_t writev_f = NULL;
 
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
@@ -131,6 +134,34 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     return read_write_mode(fd, writev_f, "writev", EPOLLOUT, iov, iovcnt);
 }
 
+#if !defined(CO_DYNAMIC_LINK)
+extern int __connect(int fd, const struct sockaddr *addr, socklen_t addrlen);
+extern ssize_t __read(int fd, void *buf, size_t count);
+extern ssize_t __readv(int fd, const struct iovec *iov, int iovcnt);
+extern ssize_t __write(int fd, const void *buf, size_t count);
+extern ssize_t __writev(int fd, const struct iovec *iov, int iovcnt);
+#endif
 }
 
-void coroutine_hook_init() {}
+void coroutine_hook_init()
+{
+#if defined(CO_DYNAMIC_LINK)
+    connect_f = (connect_t)dlsym(RTLD_NEXT, "connect");
+    read_f = (read_t)dlsym(RTLD_NEXT, "read");
+    readv_f = (readv_t)dlsym(RTLD_NEXT, "readv");
+    write_f = (write_t)dlsym(RTLD_NEXT, "write");
+    writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
+#else
+    connect_f = &__connect;
+    read_f = &__read;
+    readv_f = &__readv;
+    write_f = &__write;
+    writev_f = &__writev;
+#endif
+
+    if (!connect_f || !read_f || !write_f || !readv_f || !writev_f) {
+        fprintf(stderr, "Hook syscall failed. Please don't remove libc.a when static-link.\n");
+        assert(false);
+    }
+}
+

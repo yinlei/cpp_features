@@ -178,6 +178,7 @@ uint64_t Scheduler::GetCurrentTaskID()
 
 bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
+    // TODO: 同一个fd在不同线程同时进行read和write的处理.
     if (!IsCoroutine()) return false;
     Task* tk = GetLocalInfo().current_task;
     epoll_event ev = {event, tk};
