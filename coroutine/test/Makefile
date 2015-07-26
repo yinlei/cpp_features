@@ -7,17 +7,16 @@ OBJS=$(patsubst %, %.o, $(TARGET))
 all : $(TARGET)
 
 s_hiredis.t: hiredis.o
-	@$(CC) $(CFLAGS) $^ -L.. -lhiredis -lcoroutine -o $@ -lboost_system -lboost_thread -ldl \
-	   	-static -static-libgcc -static-libstdc++
-	@echo "LD $(TARGET)"
+	@$(CC) $(CFLAGS) $^ -o $@ -L.. -lhiredis -lcoroutine -static -static-libgcc -static-libstdc++
+	@echo "LD $@"
 
 hiredis.t: hiredis.o
-	@$(CC) $(CFLAGS) $^ -L.. -lhiredis -lcoroutine -o $@ -lboost_system -lboost_thread -ldl
-	@echo "LD $(TARGET)"
+	@$(CC) $(CFLAGS) $^ -o $@ -L.. -lhiredis -lcoroutine -ldl
+	@echo "LD $@"
 
 %.t: %.o
-	@$(CC) $(CFLAGS) $^ -L.. -lcoroutine -o $@ -lboost_system -lboost_thread -ldl
-	@echo "LD $(TARGET)"
+	@$(CC) $(CFLAGS) $^ -o $@ -lboost_thread -lboost_system -L.. -lcoroutine -ldl
+	@echo "LD $@"
 
 .cpp.o:
 	@$(CC) $(CFLAGS) -c $^ -I.. -o $@

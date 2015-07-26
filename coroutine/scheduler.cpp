@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <sys/epoll.h>
 #include <stdio.h>
+#include <string.h>
 #include <system_error>
 
 Scheduler& Scheduler::getInstance()
@@ -50,6 +51,7 @@ void Scheduler::CreateTask(TaskF const& fn)
     }
 
     ++task_count_;
+    DebugPrint(dbg_task, "task(%llu) created.", tk->id_);
     AddTask(tk);
 }
 
@@ -68,7 +70,7 @@ void Scheduler::Yield()
     Task* tk = GetLocalInfo().current_task;
     if (!tk) return ;
 
-    DebugPrint("yield task(%llu) state=%d", tk->id_, tk->state_);
+    DebugPrint(dbg_yield, "yield task(%llu) state=%d", tk->id_, tk->state_);
     int ret = swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
     if (ret) perror("swapcontext error:");
     assert(ret == 0);
@@ -81,7 +83,7 @@ uint32_t Scheduler::Run()
     uint32_t do_max_count = runnable_task_count_;
     uint32_t do_count = 0;
 
-    DebugPrint("Run [max_count=%u]--------------------------", do_max_count);
+    DebugPrint(dbg_scheduler, "Run [max_count=%u]--------------------------", do_max_count);
 
     // 每次Run执行的协程数量不能多于当前runnable协程数量
     // 以防wait状态的协程得不到执行。
@@ -90,9 +92,9 @@ uint32_t Scheduler::Run()
         uint32_t cnt = std::max((uint32_t)1, std::min(
                     do_max_count / GetOptions().chunk_count,
                     GetOptions().max_chunk_size));
-        DebugPrint("want pop %u tasks.", cnt);
+        DebugPrint(dbg_scheduler, "want pop %u tasks.", cnt);
         SList<Task> slist = run_tasks_.pop(cnt);
-        DebugPrint("really pop %u tasks.", cnt);
+        DebugPrint(dbg_scheduler, "really pop %u tasks.", cnt);
         if (slist.empty()) break;
 
         SList<Task>::iterator it = slist.begin();
@@ -100,12 +102,12 @@ uint32_t Scheduler::Run()
         {
             Task* tk = &*it;
             info.current_task = tk;
-            DebugPrint("enter task(%llu)", tk->id_);
+            DebugPrint(dbg_co_switch, "enter task(%llu)", tk->id_);
             int ret = swapcontext(&info.scheduler, &tk->ctx_);
             if (ret) perror("swapcontext error:");
             assert(ret == 0);
             ++do_count;
-            DebugPrint("exit task(%llu) state=%d", tk->id_, tk->state_);
+            DebugPrint(dbg_co_switch, "exit task(%llu) state=%d", tk->id_, tk->state_);
             info.current_task = NULL;
 
             switch (tk->state_) {
@@ -125,21 +127,23 @@ uint32_t Scheduler::Run()
                     --task_count_;
                     --runnable_task_count_;
                     it = slist.erase(it);
+                    DebugPrint(dbg_task, "task(%llu) released.", tk->id_);
                     delete tk;
                     break;
             }
         }
-        DebugPrint("push %d task return to runnable list", slist.size());
+        DebugPrint(dbg_scheduler, "push %d task return to runnable list", slist.size());
         run_tasks_.push(slist);
     }
 
     static thread_local epoll_event evs[1024];
     int n = epoll_wait(epoll_fd_, evs, 1024, 1);
-    DebugPrint("do_count=%u, do epoll event, n = %d", do_count, n);
+    DebugPrint(dbg_scheduler, "do_count=%u, do epoll event, n = %d", do_count, n);
     for (int i = 0; i < n; ++i)
     {
         Task* tk = (Task*)evs[i].data.ptr;
         epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, tk->wait_fd_, NULL);
+        DebugPrint(dbg_ioblock, "task(%llu) weak. wait_fd=%d", tk->id_, tk->wait_fd_);
         tk->wait_fd_ = -1;
         wait_tasks_.erase(tk);
         AddTask(tk);
@@ -155,7 +159,7 @@ void Scheduler::RunLoop()
 
 void Scheduler::AddTask(Task* tk)
 {
-    DebugPrint("Add task(%llu) to runnable list.", tk->id_);
+    DebugPrint(dbg_scheduler, "Add task(%llu) to runnable list.", tk->id_);
     run_tasks_.push(tk);
     ++runnable_task_count_;
 }
@@ -189,7 +193,7 @@ bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 
     tk->wait_fd_ = fd;
     tk->state_ = TaskState::io_block;
-    DebugPrint("task(%llu) io_block. wait_fd=%d", tk->id_, tk->wait_fd_);
+    DebugPrint(dbg_ioblock, "task(%llu) io_block. wait_fd=%d", tk->id_, tk->wait_fd_);
     Yield();
     return true;
 }

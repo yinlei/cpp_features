@@ -1,6 +1,7 @@
 #include "task.h"
 #include <iostream>
 #include "scheduler.h"
+#include <string.h>
 
 uint64_t Task::s_id = 0;
 

@@ -2,6 +2,7 @@
 #include "coroutine.h"
 #include <stdio.h>
 #include <memory>
+#include <strings.h>
 
 void do_redis(int num)
 {
@@ -39,7 +40,7 @@ void do_redis(int num)
 
 int main()
 {
-//    g_Scheduler.GetOptions().debug = true;
+//    g_Scheduler.GetOptions().debug = dbg_all;
     for (int i = 0; i < 2; ++i)
     {
         go [=]{ do_redis(i); };

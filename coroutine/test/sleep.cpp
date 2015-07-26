@@ -26,7 +26,7 @@ int main(int argc, char** argv)
     if (argc > 1) 
         thread_count = atoi(argv[1]);
 
-//    g_Scheduler.GetOptions().debug = true;
+//    g_Scheduler.GetOptions().debug = dbg_all;
     g_Scheduler.GetOptions().stack_size = 2048;
 
     for (int i = 0; i < co_count; ++i) {
