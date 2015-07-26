@@ -19,6 +19,40 @@ static write_t write_f = (write_t)dlsym(RTLD_NEXT, "write");
 typedef ssize_t(*writev_t)(int, const struct iovec *, int);
 static writev_t writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
 
+template <typename OriginF, typename ... Args>
+ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, Args && ... args)
+{
+    DebugPrint("hook %s. %s coroutine.", hook_fn_name, g_Scheduler.IsCoroutine() ? "In" : "Not in");
+
+    if (!g_Scheduler.IsCoroutine()) {
+        return fn(fd, std::forward<Args>(args)...);
+    } else {
+        int flags = fcntl(fd, F_GETFL, 0);
+        if (flags & O_NONBLOCK)
+            return fn(fd, std::forward<Args>(args)...);
+
+        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
+            return fn(fd, std::forward<Args>(args)...);
+
+        ssize_t n = fn(fd, std::forward<Args>(args)...);
+        if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // add into epoll, and switch other context.
+            if (!g_Scheduler.IOBlockSwitch(fd, event)) {
+                fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+                return fn(fd, std::forward<Args>(args)...);
+            }
+            
+            DebugPrint("continue task(%llu) %s. fd=%d", g_Scheduler.GetCurrentTaskID(), hook_fn_name, fd);
+            n = fn(fd, std::forward<Args>(args)...);
+        }
+
+        int e = errno;
+        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+        errno = e;
+        return n;
+    }
+}
+
 extern "C" {
 
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
@@ -76,112 +110,25 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
     }
 }
 
+
 ssize_t read(int fd, void *buf, size_t count)
 {
-    DebugPrint("hook read. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
-
-    if (!g_Scheduler.IsCoroutine()) {
-        return read_f(fd, buf, count);
-    } else {
-        int flags = fcntl(fd, F_GETFL, 0);
-        if (flags & O_NONBLOCK)
-            return read_f(fd, buf, count);
-
-        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-            return read_f(fd, buf, count);
-
-        // add into epoll, and switch other context.
-        if (!g_Scheduler.IOBlockSwitch(fd, EPOLLIN)) {
-            fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-            return read_f(fd, buf, count);
-        }
-        
-        DebugPrint("continue task(%llu) read. fd=%d", g_Scheduler.GetCurrentTaskID(), fd);
-        ssize_t s = read_f(fd, buf, count);
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-        return s;
-    }
+    return read_write_mode(fd, read_f, "read", EPOLLIN, buf, count);
 }
 
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
-    DebugPrint("hook readv. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
-
-    if (!g_Scheduler.IsCoroutine()) {
-        return readv_f(fd, iov, iovcnt);
-    } else {
-        int flags = fcntl(fd, F_GETFL, 0);
-        if (flags & O_NONBLOCK)
-            return readv_f(fd, iov, iovcnt);
-
-        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-            return readv_f(fd, iov, iovcnt);
-
-        // add into epoll, and switch other context.
-        if (!g_Scheduler.IOBlockSwitch(fd, EPOLLIN)) {
-            fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-            return readv_f(fd, iov, iovcnt);
-        }
-        
-        DebugPrint("continue task(%llu) readv. fd=%d", g_Scheduler.GetCurrentTaskID(), fd);
-        ssize_t s = readv_f(fd, iov, iovcnt);
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-        return s;
-    }
+    return read_write_mode(fd, readv_f, "readv", EPOLLIN, iov, iovcnt);
 }
 
 ssize_t write(int fd, const void *buf, size_t count)
 {
-    DebugPrint("hook write. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
-
-    if (!g_Scheduler.IsCoroutine()) {
-        return write_f(fd, buf, count);
-    } else {
-        int flags = fcntl(fd, F_GETFL, 0);
-        if (flags & O_NONBLOCK)
-            return write_f(fd, buf, count);
-
-        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-            return write_f(fd, buf, count);
-
-        // add into epoll, and switch other context.
-        if (!g_Scheduler.IOBlockSwitch(fd, EPOLLOUT)) {
-            fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-            return write_f(fd, buf, count);
-        }
-        
-        DebugPrint("continue task(%llu) write. fd=%d", g_Scheduler.GetCurrentTaskID(), fd);
-        ssize_t s = write_f(fd, buf, count);
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-        return s;
-    }
+    return read_write_mode(fd, write_f, "write", EPOLLOUT, buf, count);
 }
 
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
-    DebugPrint("hook writev. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
-
-    if (!g_Scheduler.IsCoroutine()) {
-        return writev_f(fd, iov, iovcnt);
-    } else {
-        int flags = fcntl(fd, F_GETFL, 0);
-        if (flags & O_NONBLOCK)
-            return writev_f(fd, iov, iovcnt);
-
-        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-            return writev_f(fd, iov, iovcnt);
-
-        // add into epoll, and switch other context.
-        if (!g_Scheduler.IOBlockSwitch(fd, EPOLLOUT)) {
-            fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-            return writev_f(fd, iov, iovcnt);
-        }
-        
-        DebugPrint("continue task(%llu) writev. fd=%d", g_Scheduler.GetCurrentTaskID(), fd);
-        ssize_t s = writev_f(fd, iov, iovcnt);
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-        return s;
-    }
+    return read_write_mode(fd, writev_f, "writev", EPOLLOUT, iov, iovcnt);
 }
 
 }
