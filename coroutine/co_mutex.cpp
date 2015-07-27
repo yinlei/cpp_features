@@ -35,3 +35,4 @@ void CoMutex::unlock()
 {
     return native_.unlock();
 }
+

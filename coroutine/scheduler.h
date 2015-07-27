@@ -69,6 +69,10 @@ class Scheduler : boost::noncopyable
 
         uint64_t GetCurrentTaskID();
 
+        void SetCurrentTaskDebugInfo(std::string const& info);
+
+        const char* GetCurrentTaskDebugInfo();
+
     public:
         bool IOBlockSwitch(int fd, uint32_t event);
 

@@ -18,14 +18,14 @@ Task::Task(TaskF const& fn, int stack_size)
     stack_ = new char[stack_size];
     if (!stack_) {
         state_ = TaskState::fatal;
-        fprintf(stderr, "task(%llu) init, new stack error\n", id_);
+        fprintf(stderr, "task(%s) init, new stack error\n", DebugInfo());
         return ;
     }
 
     if (-1 == getcontext(&ctx_)) {
         state_ = TaskState::fatal;
-        fprintf(stderr, "task(%llu) init, getcontext error:%s\n",
-                id_, strerror(errno));
+        fprintf(stderr, "task(%s) init, getcontext error:%s\n",
+                DebugInfo(), strerror(errno));
         return ;
     }
 
@@ -39,4 +39,18 @@ Task::~Task()
 {
     delete []stack_;
 }
+
+void Task::SetDebugInfo(std::string const& info)
+{
+    debug_info_ = info + "(" + std::to_string(id_) + ")";
+}
+
+const char* Task::DebugInfo()
+{
+    if (debug_info_.empty())
+        debug_info_ = std::to_string(id_);
+
+    return debug_info_.c_str();
+}
+
 

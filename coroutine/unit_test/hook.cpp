@@ -24,7 +24,7 @@ void foo()
 
     char buf[12] = "12\n";
     ssize_t n = write(socketfd, buf, 3);
-    printf("writen %d bytes.\n", n);
+    printf("writen %d bytes.\n", (int)n);
 }
 
 int main()
