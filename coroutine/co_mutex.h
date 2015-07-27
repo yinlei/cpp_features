@@ -1,17 +1,16 @@
 #pragma once
-#include <mutex>
+#include <stdint.h>
 
 class CoMutex
 {
     static uint64_t s_id;
-    std::mutex native_;
     uint64_t id_;
 
 public:
     CoMutex();
+    ~CoMutex();
 
     void lock();
-    bool try_lock();
     void unlock();
 };
 

@@ -77,9 +77,8 @@ class Scheduler : boost::noncopyable
         bool IOBlockSwitch(int fd, uint32_t event);
 
         // 用户自定义的阻塞切换, type范围限定为: [0, 0xffffffff]
-        bool UserBlockSwitch(uint32_t type, uint64_t wait_id, bool yield_immediately = true);
-        uint32_t UserBlockWeak(uint32_t type, uint64_t wait_id, uint32_t weak_count = 0xffffffff);
-        void UserBlockCancel();
+        bool UserBlockWait(uint32_t type, uint64_t wait_id);
+        uint32_t UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wakeup_count = 1);
 
     private:
         Scheduler();
@@ -88,9 +87,8 @@ class Scheduler : boost::noncopyable
         void AddTask(Task* tk);
 
         // 协程框架定义的阻塞切换, type范围不可与用户自定义范围重叠, 指定为:[-xxxxx, -1]
-        bool SysBlockSwitch(int64_t type, uint64_t wait_id, bool yield_immediately);
-        uint32_t SysBlockWeak(int64_t type, uint64_t wait_id, uint32_t weak_count = 0xffffffff);
-        void SysBlockCancel();
+        bool BlockWait(int64_t type, uint64_t wait_id);
+        uint32_t BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_count = 1);
 
         ThreadLocalInfo& GetLocalInfo();
 
@@ -99,7 +97,7 @@ class Scheduler : boost::noncopyable
         TaskList wait_tasks_;
 
         // user define wait tasks table.
-        typedef std::unordered_map<int64_t, std::unordered_map<uint64_t, TSQueue<Task, false>>> TaskTable;
+        typedef std::unordered_map<int64_t, std::unordered_map<uint64_t, std::pair<uint32_t, TSQueue<Task, false>>>> TaskTable;
         TaskTable user_wait_tasks_;
         LFLock user_wait_lock_;
 

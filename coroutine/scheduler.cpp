@@ -125,10 +125,22 @@ uint32_t Scheduler::Run()
                 case TaskState::sys_block:
                 case TaskState::user_block:
                     {
-                        --runnable_task_count_;
-                        it = slist.erase(it);
-                        std::lock_guard<LFLock> lock(user_wait_lock_);
-                        user_wait_tasks_[tk->user_wait_type_][tk->user_wait_id_].push(tk);
+                        std::unique_lock<LFLock> lock(user_wait_lock_);
+                        auto &wake_pair = user_wait_tasks_[tk->user_wait_type_][tk->user_wait_id_];
+                        if (wake_pair.first) {
+                            --wake_pair.first;
+                            tk->state_ = TaskState::runnable;
+                        } else {
+                            wake_pair.second.push(tk);
+                        }
+                        lock.unlock();
+
+                        if (tk->state_ == TaskState::runnable) {
+                            ++it;
+                        } else {
+                            --runnable_task_count_;
+                            it = slist.erase(it);
+                        }
                     }
                     break;
 
@@ -221,37 +233,31 @@ bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
     return true;
 }
 
-bool Scheduler::UserBlockSwitch(uint32_t type, uint64_t wait_id, bool yield_immediately)
+bool Scheduler::UserBlockWait(uint32_t type, uint64_t wait_id)
 {
-    return SysBlockSwitch((int64_t)type, wait_id, yield_immediately);
+    return BlockWait((int64_t)type, wait_id);
 }
 
-uint32_t Scheduler::UserBlockWeak(uint32_t type, uint64_t wait_id, uint32_t weak_count)
+uint32_t Scheduler::UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wakeup_count)
 {
-    return SysBlockWeak((int64_t)type, wait_id, weak_count);
+    return BlockWakeup((int64_t)type, wait_id, wakeup_count);
 }
 
-void Scheduler::UserBlockCancel()
-{
-    SysBlockCancel();
-}
-
-bool Scheduler::SysBlockSwitch(int64_t type, uint64_t wait_id, bool yield_immediately)
+bool Scheduler::BlockWait(int64_t type, uint64_t wait_id)
 {
     if (!IsCoroutine()) return false;
     Task* tk = GetLocalInfo().current_task;
     tk->user_wait_type_ = type;
     tk->user_wait_id_ = wait_id;
     tk->state_ = type < 0 ? TaskState::sys_block : TaskState::user_block;
-    DebugPrint(dbg_userblock, "task(%s) %s. wait_type=%lld, wait_id=%llu, yield_immediately=%s",
-            tk->DebugInfo(), type < 0 ? "sys_block" : "user_block", (long long int)tk->user_wait_type_, (long long unsigned)tk->user_wait_id_,
-            yield_immediately ? "true" : "false");
-    if (yield_immediately)
-        Yield();
+    DebugPrint(dbg_userblock, "task(%s) %s. wait_type=%lld, wait_id=%llu",
+            tk->DebugInfo(), type < 0 ? "sys_block" : "user_block",
+            (long long int)tk->user_wait_type_, (long long unsigned)tk->user_wait_id_);
+    Yield();
     return true;
 }
 
-uint32_t Scheduler::SysBlockWeak(int64_t type, uint64_t wait_id, uint32_t weak_count)
+uint32_t Scheduler::BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_count)
 {
     std::unique_lock<LFLock> locker(user_wait_lock_);
     auto it = user_wait_tasks_.find(type);
@@ -260,8 +266,8 @@ uint32_t Scheduler::SysBlockWeak(int64_t type, uint64_t wait_id, uint32_t weak_c
     auto it2 = it->second.find(wait_id);
     if (it2 == it->second.end()) return 0;
 
-    auto& task_queue = it2->second;
-    SList<Task> tasks = task_queue.pop(weak_count);
+    auto& task_queue = it2->second.second;
+    SList<Task> tasks = task_queue.pop(wakeup_count);
     if (task_queue.empty()) {
         if (it->second.size() > 1) {
             it->second.erase(wait_id);
@@ -269,31 +275,23 @@ uint32_t Scheduler::SysBlockWeak(int64_t type, uint64_t wait_id, uint32_t weak_c
             user_wait_tasks_.erase(type);
         }
     }
+    std::size_t c = tasks.size();
+    if (c < wakeup_count) // 允许提前设置唤醒标志, 以便多线程同步。
+        it2->second.first += wakeup_count - c;
+    uint32_t domain_wakeup = it2->second.first;
     locker.unlock();
-    std::size_t c = 0;
+
     for (auto &task: tasks)
     {
         ++c;
         Task *tk = &task;
-        DebugPrint(dbg_userblock, "%s weak task(%s). wait_type=%lld, wait_id=%llu",
+        DebugPrint(dbg_userblock, "%s wakeup task(%s). wait_type=%lld, wait_id=%llu",
                 type < 0 ? "sys_block" : "user_block", tk->DebugInfo(), (long long int)type, (long long unsigned)wait_id);
         AddTask(tk);
     }
-    DebugPrint(dbg_userblock, "%s weak %u tasks. wait_type=%lld, wait_id=%llu",
-            type < 0 ? "sys_block" : "user_block", (unsigned)c, (long long int)type, (long long unsigned)wait_id);
-    return c;
-}
 
-void Scheduler::SysBlockCancel()
-{
-    if (!IsCoroutine()) return ;
-    Task* tk = GetLocalInfo().current_task;
-    if (tk->state_ != TaskState::sys_block && tk->state_ != TaskState::io_block) return ;
-    DebugPrint(dbg_userblock, "task(%s) cancel %s. wait_type=%lld, wait_id=%llu",
-            tk->DebugInfo(), tk->user_wait_type_ < 0 ? "sys_block" : "user_block",
-            (long long int)tk->user_wait_type_, (long long unsigned)tk->user_wait_id_);
-    tk->user_wait_type_ = (int64_t)SysBlockType::sysblock_none;
-    tk->user_wait_id_ = 0;
-    tk->state_ = TaskState::runnable;
+    DebugPrint(dbg_userblock, "%s wakeup %u tasks, domain wakeup=%u. wait_type=%lld, wait_id=%llu",
+            type < 0 ? "sys_block" : "user_block", (unsigned)c, domain_wakeup, (long long int)type, (long long unsigned)wait_id);
+    return c;
 }
 

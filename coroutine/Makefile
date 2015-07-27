@@ -16,6 +16,7 @@ $(DYNAMIC_LIB) : $(OBJS)
 	@$(CC) $(CFLAGS) -DCO_DYNAMIC_LINK -c linux_glibc_hook.cpp -o linux_glibc_hook.o
 	@$(CC) $(CFLAGS) -shared $^ -o $@ -lpthread
 	@echo "LD $(DYNAMIC_LIB)"
+	@rm linux_glibc_hook.o -f
 
 .cpp.o:
 	@echo "CC $@"
