@@ -103,12 +103,12 @@ uint32_t Scheduler::Run()
             Task* tk = &*it;
             info.current_task = tk;
             tk->state_ = TaskState::runnable;
-            DebugPrint(dbg_co_switch, "enter task(%s)", tk->DebugInfo());
+            DebugPrint(dbg_switch, "enter task(%s)", tk->DebugInfo());
             int ret = swapcontext(&info.scheduler, &tk->ctx_);
             if (ret) perror("swapcontext error:");
             assert(ret == 0);
             ++do_count;
-            DebugPrint(dbg_co_switch, "exit task(%s) state=%d", tk->DebugInfo(), tk->state_);
+            DebugPrint(dbg_switch, "exit task(%s) state=%d", tk->DebugInfo(), tk->state_);
             info.current_task = NULL;
 
             switch (tk->state_) {
@@ -126,21 +126,21 @@ uint32_t Scheduler::Run()
                 case TaskState::user_block:
                     {
                         std::unique_lock<LFLock> lock(user_wait_lock_);
-                        auto &wake_pair = user_wait_tasks_[tk->user_wait_type_][tk->user_wait_id_];
-                        if (wake_pair.first) {
-                            --wake_pair.first;
+                        auto &zone = user_wait_tasks_[tk->user_wait_type_];
+                        auto &wait_pair = zone[tk->user_wait_id_];
+                        auto &task_queue = wait_pair.second;
+                        if (wait_pair.first) {
+                            --wait_pair.first;
                             tk->state_ = TaskState::runnable;
-                        } else {
-                            wake_pair.second.push(tk);
-                        }
-                        lock.unlock();
-
-                        if (tk->state_ == TaskState::runnable) {
                             ++it;
                         } else {
                             --runnable_task_count_;
                             it = slist.erase(it);
+                            task_queue.push(tk);
                         }
+
+                        ClearWaitPairWithoutLock(tk->user_wait_type_,
+                                tk->user_wait_id_, zone, wait_pair);
                     }
                     break;
 
@@ -238,6 +238,11 @@ bool Scheduler::UserBlockWait(uint32_t type, uint64_t wait_id)
     return BlockWait((int64_t)type, wait_id);
 }
 
+bool Scheduler::TryUserBlockWait(uint32_t type, uint64_t wait_id)
+{
+    return TryBlockWait((int64_t)type, wait_id);
+}
+
 uint32_t Scheduler::UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wakeup_count)
 {
     return BlockWakeup((int64_t)type, wait_id, wakeup_count);
@@ -250,48 +255,70 @@ bool Scheduler::BlockWait(int64_t type, uint64_t wait_id)
     tk->user_wait_type_ = type;
     tk->user_wait_id_ = wait_id;
     tk->state_ = type < 0 ? TaskState::sys_block : TaskState::user_block;
-    DebugPrint(dbg_userblock, "task(%s) %s. wait_type=%lld, wait_id=%llu",
+    DebugPrint(dbg_wait, "task(%s) %s. wait_type=%lld, wait_id=%llu",
             tk->DebugInfo(), type < 0 ? "sys_block" : "user_block",
             (long long int)tk->user_wait_type_, (long long unsigned)tk->user_wait_id_);
     Yield();
     return true;
 }
 
-uint32_t Scheduler::BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_count)
+bool Scheduler::TryBlockWait(int64_t type, uint64_t wait_id)
 {
     std::unique_lock<LFLock> locker(user_wait_lock_);
     auto it = user_wait_tasks_.find(type);
-    if (it == user_wait_tasks_.end()) return 0;
+    if (user_wait_tasks_.end() == it) return false;
 
-    auto it2 = it->second.find(wait_id);
-    if (it2 == it->second.end()) return 0;
+    auto &zone = it->second;
+    auto it2 = zone.find(wait_id);
+    if (zone.end() == it2) return false;
 
-    auto& task_queue = it2->second.second;
-    SList<Task> tasks = task_queue.pop(wakeup_count);
-    if (task_queue.empty()) {
-        if (it->second.size() > 1) {
-            it->second.erase(wait_id);
-        } else {
-            user_wait_tasks_.erase(type);
-        }
+    auto &wait_pair = it2->second;
+    if (wait_pair.first > 0) {
+        --wait_pair.first;
+        ClearWaitPairWithoutLock(type, wait_id, zone, wait_pair);
+        return true;
     }
+
+    return false;
+}
+
+uint32_t Scheduler::BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_count)
+{
+    std::unique_lock<LFLock> locker(user_wait_lock_);
+    auto &zone = user_wait_tasks_[type];
+    auto &wait_pair = zone[wait_id];
+    auto &task_queue = wait_pair.second;
+    SList<Task> tasks = task_queue.pop(wakeup_count);
     std::size_t c = tasks.size();
     if (c < wakeup_count) // 允许提前设置唤醒标志, 以便多线程同步。
-        it2->second.first += wakeup_count - c;
-    uint32_t domain_wakeup = it2->second.first;
+        wait_pair.first += wakeup_count - c;
+    ClearWaitPairWithoutLock(type, wait_id, zone, wait_pair);
+    uint32_t domain_wakeup = wait_pair.first;
     locker.unlock();
 
     for (auto &task: tasks)
     {
         ++c;
         Task *tk = &task;
-        DebugPrint(dbg_userblock, "%s wakeup task(%s). wait_type=%lld, wait_id=%llu",
+        DebugPrint(dbg_wait, "%s wakeup task(%s). wait_type=%lld, wait_id=%llu",
                 type < 0 ? "sys_block" : "user_block", tk->DebugInfo(), (long long int)type, (long long unsigned)wait_id);
         AddTask(tk);
     }
 
-    DebugPrint(dbg_userblock, "%s wakeup %u tasks, domain wakeup=%u. wait_type=%lld, wait_id=%llu",
+    DebugPrint(dbg_wait, "%s wakeup %u tasks, domain wakeup=%u. wait_type=%lld, wait_id=%llu",
             type < 0 ? "sys_block" : "user_block", (unsigned)c, domain_wakeup, (long long int)type, (long long unsigned)wait_id);
     return c;
+}
+
+void Scheduler::ClearWaitPairWithoutLock(int64_t type,
+        uint64_t wait_id, WaitZone& zone, WaitPair& wait_pair)
+{
+    if (wait_pair.second.empty() && wait_pair.first == 0) {
+        if (zone.size() > 1) {
+            zone.erase(wait_id);
+        } else {
+            user_wait_tasks_.erase(type);
+        }
+    }
 }
 
