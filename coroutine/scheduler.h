@@ -50,6 +50,9 @@ class Scheduler : boost::noncopyable
 {
     public:
         typedef TSQueue<Task> TaskList;  // 线程安全的协程队列
+        typedef std::pair<uint32_t, TSQueue<Task, false>> WaitPair;
+        typedef std::unordered_map<uint64_t, WaitPair> WaitZone;
+        typedef std::unordered_map<int64_t, WaitZone> WaitTable;
 
         static Scheduler& getInstance();
 
@@ -131,10 +134,6 @@ class Scheduler : boost::noncopyable
         // }@
         /// ------------------------------------------------------------------------
 
-        typedef std::pair<uint32_t, TSQueue<Task, false>> WaitPair;
-        typedef std::unordered_map<uint64_t, WaitPair> WaitZone;
-        typedef std::unordered_map<int64_t, WaitZone> WaitTable;
-        
         // 清理没有等待也没有被等待的WaitPair.
         void ClearWaitPairWithoutLock(int64_t type, uint64_t wait_id, WaitZone& zone, WaitPair& wait_pair);
 

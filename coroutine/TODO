@@ -1,0 +1,3 @@
+优化co_mutex, 为BlockWait抽象出一个WaitObject, 管理等待中的协程, 以免不同的WaitObject竞争同一个全局锁.
+添加channel
+支持exception
