@@ -161,7 +161,7 @@ void coroutine_hook_init()
 
     if (!connect_f || !read_f || !write_f || !readv_f || !writev_f) {
         fprintf(stderr, "Hook syscall failed. Please don't remove libc.a when static-link.\n");
-        assert(false);
+        exit(1);
     }
 }
 

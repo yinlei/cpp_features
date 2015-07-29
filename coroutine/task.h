@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <ucontext.h>
 #include <functional>
+#include <exception>
 #include "ts_queue.h"
 
 enum class TaskState
@@ -16,6 +17,7 @@ enum class TaskState
 
 typedef std::function<void()> TaskF;
 
+class BlockObject;
 struct Task
     : public TSQueueHook
 {
@@ -25,9 +27,12 @@ struct Task
     TaskF fn_;
     char* stack_;
     std::string debug_info_;
+    std::exception_ptr eptr_;
+
     int wait_fd_;
     int64_t user_wait_type_;
     uint64_t user_wait_id_;
+    BlockObject* block_;
 
     explicit Task(TaskF const& fn, int stack_size);
     ~Task();

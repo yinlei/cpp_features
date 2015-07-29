@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <list>
 #include "task.h"
+#include "block_object.h"
 #include "co_mutex.h"
 
 #define DebugPrint(type, fmt, ...) \
@@ -22,12 +23,22 @@ static const uint64_t dbg_task = 0x1 << 3;
 static const uint64_t dbg_switch = 0x1 << 4;
 static const uint64_t dbg_ioblock = 0x1 << 5;
 static const uint64_t dbg_wait = 0x1 << 6;
+static const uint64_t dbg_exception = 0x1 << 7;
+static const uint64_t dbg_syncblock = 0x1 << 8;
 ///-------------------
+
+enum class eCoExHandle : uint8_t
+{
+    immedaitely_throw,
+    delay_rethrow,
+    debugger_only,
+};
 
 ///---- 配置选项
 struct CoroutineOptions
 {
     uint64_t debug = 0;             // 调试选项, 例如: dbg_switch 或 dbg_hook|dbg_task|dbg_wait
+    eCoExHandle exception_handle = eCoExHandle::immedaitely_throw;
     uint32_t stack_size = 128 * 1024; // 协程栈大小, 只会影响在此值设置之后新创建的协程.
     uint32_t chunk_count = 128;     // Run每次最多从run队列中pop出1/chunk_count * task_count个task.
     uint32_t max_chunk_size = 128;  // Run每次最多从run队列中pop出max_chunk_size个task.
@@ -153,6 +164,7 @@ class Scheduler : boost::noncopyable
         std::atomic<uint32_t> runnable_task_count_;
 
     friend class CoMutex;
+    friend class BlockObject;
 };
 
 #define g_Scheduler Scheduler::getInstance()

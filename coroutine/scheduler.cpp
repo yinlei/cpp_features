@@ -1,6 +1,6 @@
 #include "scheduler.h"
 #include <ucontext.h>
-#include <assert.h>
+#include "error.h"
 #include <sys/epoll.h>
 #include <stdio.h>
 #include <string.h>
@@ -17,8 +17,10 @@ Scheduler::Scheduler()
 {
     epoll_fd_ = epoll_create(1024);
     if (epoll_fd_ == -1) {
-        perror("CoroutineScheduler init failed. epoll create error:");
-        assert(false);
+        fprintf(stderr,
+                "CoroutineScheduler init failed. epoll create error:%s\n",
+                strerror(errno));
+        exit(1);
     }
 
     coroutine_hook_init();
@@ -72,8 +74,10 @@ void Scheduler::Yield()
 
     DebugPrint(dbg_yield, "yield task(%s) state=%d", tk->DebugInfo(), tk->state_);
     int ret = swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
-    if (ret) perror("swapcontext error:");
-    assert(ret == 0);
+    if (ret) {
+        fprintf(stderr, "swapcontext error:%s\n", strerror(errno));
+        ThrowError(eCoErrorCode::ec_yield_failed);
+    }
 }
 
 uint32_t Scheduler::Run()
@@ -105,8 +109,11 @@ uint32_t Scheduler::Run()
             tk->state_ = TaskState::runnable;
             DebugPrint(dbg_switch, "enter task(%s)", tk->DebugInfo());
             int ret = swapcontext(&info.scheduler, &tk->ctx_);
-            if (ret) perror("swapcontext error:");
-            assert(ret == 0);
+            if (ret) {
+                fprintf(stderr, "swapcontext error:%s\n", strerror(errno));
+                run_tasks_.push(slist);
+                ThrowError(eCoErrorCode::ec_swapcontext_failed);
+            }
             ++do_count;
             DebugPrint(dbg_switch, "exit task(%s) state=%d", tk->DebugInfo(), tk->state_);
             info.current_task = NULL;
@@ -125,22 +132,30 @@ uint32_t Scheduler::Run()
                 case TaskState::sys_block:
                 case TaskState::user_block:
                     {
-                        std::unique_lock<LFLock> lock(user_wait_lock_);
-                        auto &zone = user_wait_tasks_[tk->user_wait_type_];
-                        auto &wait_pair = zone[tk->user_wait_id_];
-                        auto &task_queue = wait_pair.second;
-                        if (wait_pair.first) {
-                            --wait_pair.first;
-                            tk->state_ = TaskState::runnable;
-                            ++it;
-                        } else {
-                            --runnable_task_count_;
+                        if (tk->block_) {
                             it = slist.erase(it);
-                            task_queue.push(tk);
+                            if (tk->block_->AddWaitTask(tk))
+                                --runnable_task_count_;
+                            else
+                                run_tasks_.push(tk);
+                            tk->block_ = NULL;
+                        } else {
+                            std::unique_lock<LFLock> lock(user_wait_lock_);
+                            auto &zone = user_wait_tasks_[tk->user_wait_type_];
+                            auto &wait_pair = zone[tk->user_wait_id_];
+                            auto &task_queue = wait_pair.second;
+                            if (wait_pair.first) {
+                                --wait_pair.first;
+                                tk->state_ = TaskState::runnable;
+                                ++it;
+                            } else {
+                                --runnable_task_count_;
+                                it = slist.erase(it);
+                                task_queue.push(tk);
+                            }
+                            ClearWaitPairWithoutLock(tk->user_wait_type_,
+                                    tk->user_wait_id_, zone, wait_pair);
                         }
-
-                        ClearWaitPairWithoutLock(tk->user_wait_type_,
-                                tk->user_wait_id_, zone, wait_pair);
                     }
                     break;
 
@@ -150,6 +165,12 @@ uint32_t Scheduler::Run()
                     --runnable_task_count_;
                     it = slist.erase(it);
                     DebugPrint(dbg_task, "task(%s) released.", tk->DebugInfo());
+                    if (tk->eptr_) {
+                        std::exception_ptr ep = tk->eptr_;
+                        run_tasks_.push(slist);
+                        delete tk;
+                        std::rethrow_exception(ep);
+                    }
                     delete tk;
                     break;
             }

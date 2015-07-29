@@ -7,13 +7,31 @@ uint64_t Task::s_id = 0;
 
 static void C_func(Task* self)
 {
-    (self->fn_)();
+    try {
+        (self->fn_)();
+    } catch (...) {
+        switch (g_Scheduler.GetOptions().exception_handle) {
+            case eCoExHandle::immedaitely_throw:
+                throw ;
+                break;
+
+            case eCoExHandle::delay_rethrow:
+                self->eptr_ = std::current_exception();
+                break;
+
+            default:
+            case eCoExHandle::debugger_only:
+                DebugPrint(dbg_exception, "task(%s) has uncaught exception.", self->DebugInfo());
+                break;
+        }
+    }
+
     self->state_ = TaskState::done;
     Scheduler::getInstance().Yield();
 }
 
 Task::Task(TaskF const& fn, int stack_size)
-    : id_(++s_id), state_(TaskState::runnable), fn_(fn), wait_fd_(-1)
+    : id_(++s_id), state_(TaskState::runnable), fn_(fn), wait_fd_(-1), block_(NULL)
 {
     stack_ = new char[stack_size];
     if (!stack_) {

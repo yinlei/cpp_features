@@ -5,10 +5,11 @@ LINK=-Lgtest/lib/.libs -lgtest -lpthread -lgtest_main -L../.. -lcoroutine
 STATIC=-static -static-libgcc -static-libstdc++
 TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp)) $(patsubst %.cpp, s_%.t, $(wildcard *.cpp))
 
-all : gtest/lib/libgtest_main.la $(TARGET)
+all : /usr/lib/libgtest.a $(TARGET)
 
-gtest/lib/gtest_main.a:
+/usr/lib/libgtest.a:
 	cd gtest && ./configure && make
+	sudo cp gtest/lib/.libs/* /usr/lib
 
 s_%.t: %.o
 	@echo "LD $@"

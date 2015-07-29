@@ -1,33 +1,31 @@
 #include "co_mutex.h"
 #include "scheduler.h"
+#include "error.h"
 #include <assert.h>
 
-uint64_t CoMutex::s_id = 0;
-
 CoMutex::CoMutex()
-    : id_(++s_id)
 {
-    g_Scheduler.BlockWakeup((int64_t)SysBlockType::sysblock_co_mutex, id_);
-}
-
-CoMutex::~CoMutex()
-{
-    g_Scheduler.BlockWait((int64_t)SysBlockType::sysblock_co_mutex, id_);
+    block_.Wakeup();
 }
 
 void CoMutex::lock()
 {
-    assert(g_Scheduler.IsCoroutine());
-    g_Scheduler.BlockWait((int64_t)SysBlockType::sysblock_co_mutex, id_);
+    block_.CoBlockWait();
 }
 
 bool CoMutex::try_lock()
 {
-    return g_Scheduler.TryBlockWait((int64_t)SysBlockType::sysblock_co_mutex, id_);
+    return block_.TryBlockWait();
+}
+
+bool CoMutex::is_lock()
+{
+    return block_.IsWakeup();
 }
 
 void CoMutex::unlock()
 {
-    g_Scheduler.BlockWakeup((int64_t)SysBlockType::sysblock_co_mutex, id_);
+    if (!block_.Wakeup())
+        ThrowError(eCoErrorCode::ec_mutex_double_unlock);
 }
 
