@@ -5,7 +5,7 @@
 #include "scheduler.h"
 
 template <typename OriginF, typename ... Args>
-ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, Args && ... args)
+ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
 {
     DebugPrint(dbg_hook, "hook %s. %s coroutine.", hook_fn_name, g_Scheduler.IsCoroutine() ? "In" : "Not in");
 
@@ -21,8 +21,29 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
 
         ssize_t n = fn(fd, std::forward<Args>(args)...);
         if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            // get timeout option.
+            Task* tk = g_Scheduler.GetCurrentTask();
+            uint64_t timer_id = 0;
+            struct timeval timeout;
+            socklen_t timeout_blen = sizeof(timeout);
+            if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
+                if (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
+                    std::chrono::microseconds duration{timeout.tv_sec * 1000 * 1000 +
+                        timeout.tv_usec};
+                    tk->IncrementRef(); // timer use ref.
+                    timer_id = g_Scheduler.ExpireAt(duration, [=]{
+                            g_Scheduler.IOBlockCancel(tk, fd);
+                            tk->DecrementRef(); // timer use ref.
+                            });
+                }
+            }
+            
             // add into epoll, and switch other context.
-            if (!g_Scheduler.IOBlockSwitch(fd, event)) {
+            bool switched = g_Scheduler.IOBlockSwitch(fd, event);
+            if (timer_id && g_Scheduler.CancelTimer(timer_id))
+                tk->DecrementRef(); // timer use ref.
+
+            if (!switched) {
                 fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
                 return fn(fd, std::forward<Args>(args)...);
             }
@@ -116,22 +137,22 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 
 ssize_t read(int fd, void *buf, size_t count)
 {
-    return read_write_mode(fd, read_f, "read", EPOLLIN, buf, count);
+    return read_write_mode(fd, read_f, "read", EPOLLIN, SO_RCVTIMEO, buf, count);
 }
 
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
-    return read_write_mode(fd, readv_f, "readv", EPOLLIN, iov, iovcnt);
+    return read_write_mode(fd, readv_f, "readv", EPOLLIN, SO_RCVTIMEO, iov, iovcnt);
 }
 
 ssize_t write(int fd, const void *buf, size_t count)
 {
-    return read_write_mode(fd, write_f, "write", EPOLLOUT, buf, count);
+    return read_write_mode(fd, write_f, "write", EPOLLOUT, SO_SNDTIMEO, buf, count);
 }
 
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
-    return read_write_mode(fd, writev_f, "writev", EPOLLOUT, iov, iovcnt);
+    return read_write_mode(fd, writev_f, "writev", EPOLLOUT, SO_SNDTIMEO, iov, iovcnt);
 }
 
 #if !defined(CO_DYNAMIC_LINK)

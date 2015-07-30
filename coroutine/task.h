@@ -28,6 +28,7 @@ struct Task
     char* stack_;
     std::string debug_info_;
     std::exception_ptr eptr_;
+    std::atomic<uint32_t> ref_count_;
 
     int wait_fd_;
     int64_t user_wait_type_;
@@ -39,6 +40,9 @@ struct Task
 
     void SetDebugInfo(std::string const& info);
     const char* DebugInfo();
+
+    void IncrementRef();
+    void DecrementRef();
 
     static uint64_t s_id;
 };

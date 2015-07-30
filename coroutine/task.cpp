@@ -31,7 +31,8 @@ static void C_func(Task* self)
 }
 
 Task::Task(TaskF const& fn, int stack_size)
-    : id_(++s_id), state_(TaskState::runnable), fn_(fn), wait_fd_(-1), block_(NULL)
+    : id_(++s_id), state_(TaskState::runnable), fn_(fn),
+    ref_count_{1}, wait_fd_(-1), block_(NULL)
 {
     stack_ = new char[stack_size];
     if (!stack_) {
@@ -69,6 +70,17 @@ const char* Task::DebugInfo()
         debug_info_ = std::to_string(id_);
 
     return debug_info_.c_str();
+}
+
+void Task::IncrementRef()
+{
+    ++ref_count_;
+}
+
+void Task::DecrementRef()
+{
+    if (--ref_count_ == 0)
+        delete this;
 }
 
 

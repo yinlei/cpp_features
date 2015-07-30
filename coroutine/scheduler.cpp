@@ -115,7 +115,7 @@ uint32_t Scheduler::Run()
                 ThrowError(eCoErrorCode::ec_swapcontext_failed);
             }
             ++do_count;
-            DebugPrint(dbg_switch, "exit task(%s) state=%d", tk->DebugInfo(), tk->state_);
+            DebugPrint(dbg_switch, "leave task(%s) state=%d", tk->DebugInfo(), tk->state_);
             info.current_task = NULL;
 
             switch (tk->state_) {
@@ -168,10 +168,10 @@ uint32_t Scheduler::Run()
                     if (tk->eptr_) {
                         std::exception_ptr ep = tk->eptr_;
                         run_tasks_.push(slist);
-                        delete tk;
+                        tk->DecrementRef();
                         std::rethrow_exception(ep);
-                    }
-                    delete tk;
+                    } else
+                        tk->DecrementRef();
                     break;
             }
         }
@@ -179,17 +179,24 @@ uint32_t Scheduler::Run()
         run_tasks_.push(slist);
     }
 
+    // epoll
     static thread_local epoll_event evs[1024];
     int n = epoll_wait(epoll_fd_, evs, 1024, 1);
     DebugPrint(dbg_scheduler, "do_count=%u, do epoll event, n = %d", do_count, n);
     for (int i = 0; i < n; ++i)
     {
         Task* tk = (Task*)evs[i].data.ptr;
-        epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, tk->wait_fd_, NULL);
-        DebugPrint(dbg_ioblock, "task(%s) weak. wait_fd=%d", tk->DebugInfo(), tk->wait_fd_);
-        tk->wait_fd_ = -1;
-        wait_tasks_.erase(tk);
-        AddTask(tk);
+        IOBlockCancel(tk, tk->wait_fd_);
+    }
+
+    // timer
+    std::vector<std::shared_ptr<CoTimer>> timers;
+    timer_mgr_.GetExpired(timers, 128);
+    for (auto &sp_timer : timers)
+    {
+        DebugPrint(dbg_timer, "enter timer callback %llu", (long long unsigned)sp_timer->GetId());
+        (*sp_timer)();
+        DebugPrint(dbg_timer, "leave timer callback %llu", (long long unsigned)sp_timer->GetId());
     }
 
     return do_count;
@@ -236,6 +243,11 @@ const char* Scheduler::GetCurrentTaskDebugInfo()
     return tk ? tk->DebugInfo() : "";
 }
 
+Task* Scheduler::GetCurrentTask()
+{
+    return GetLocalInfo().current_task;
+}
+
 bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
     // TODO: 支持同一个fd被多个协程等待
@@ -249,9 +261,23 @@ bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 
     tk->wait_fd_ = fd;
     tk->state_ = TaskState::io_block;
+    tk->IncrementRef();     // epoll use ref.
     DebugPrint(dbg_ioblock, "task(%s) io_block. wait_fd=%d", tk->DebugInfo(), tk->wait_fd_);
     Yield();
     return true;
+}
+
+void Scheduler::IOBlockCancel(Task* tk, int fd)
+{
+    if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, NULL)) {
+        DebugPrint(dbg_ioblock, "task(%s) io_block wakeup. wait_fd=%d", tk->DebugInfo(), tk->wait_fd_);
+        if (wait_tasks_.erase(tk)) {
+            tk->wait_fd_ = -1;
+            AddTask(tk);
+        }
+
+        tk->DecrementRef();     // epoll use ref.
+    }
 }
 
 bool Scheduler::UserBlockWait(uint32_t type, uint64_t wait_id)
@@ -267,6 +293,22 @@ bool Scheduler::TryUserBlockWait(uint32_t type, uint64_t wait_id)
 uint32_t Scheduler::UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wakeup_count)
 {
     return BlockWakeup((int64_t)type, wait_id, wakeup_count);
+}
+
+uint64_t Scheduler::ExpireAt(CoTimerMgr::TimePoint const& time_point,
+        CoTimer::fn_t const& fn)
+{
+    uint64_t id = timer_mgr_.ExpireAt(time_point, fn);
+    DebugPrint(dbg_timer, "add timer %llu", (long long unsigned)id);
+    return id;
+}
+
+bool Scheduler::CancelTimer(uint64_t timer_id)
+{
+    bool ok = timer_mgr_.Cancel(timer_id);
+    DebugPrint(dbg_timer, "cancel timer %llu %s", (long long unsigned)timer_id,
+            ok ? "success" : "failed");
+    return ok;
 }
 
 bool Scheduler::BlockWait(int64_t type, uint64_t wait_id)

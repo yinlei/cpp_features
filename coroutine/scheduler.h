@@ -6,6 +6,7 @@
 #include "task.h"
 #include "block_object.h"
 #include "co_mutex.h"
+#include "timer.h"
 
 #define DebugPrint(type, fmt, ...) \
     do { \
@@ -15,6 +16,7 @@
     } while(0)
 
 ///---- debugger flags
+static const uint64_t dbg_none = 0;
 static const uint64_t dbg_all = 0xffffffffffffffffULL;
 static const uint64_t dbg_hook = 0x1;
 static const uint64_t dbg_yield = 0x1 << 1;
@@ -25,6 +27,7 @@ static const uint64_t dbg_ioblock = 0x1 << 5;
 static const uint64_t dbg_wait = 0x1 << 6;
 static const uint64_t dbg_exception = 0x1 << 7;
 static const uint64_t dbg_syncblock = 0x1 << 8;
+static const uint64_t dbg_timer = 0x1 << 9;
 ///-------------------
 
 enum class eCoExHandle : uint8_t
@@ -49,12 +52,6 @@ struct ThreadLocalInfo
 {
     Task* current_task;
     ucontext_t scheduler;
-};
-
-enum class SysBlockType : int64_t
-{
-    sysblock_none = -1,
-    sysblock_co_mutex = -2,
 };
 
 class Scheduler : boost::noncopyable
@@ -108,6 +105,7 @@ class Scheduler : boost::noncopyable
         //  如果加入成功, 返回true, 协程将放弃执行权, 切换回调度器.
         //  如果加入失败, 返回false, 协程将继续执行.
         bool IOBlockSwitch(int fd, uint32_t event);
+        void IOBlockCancel(Task* tk, int fd);
 
         /// ------------------------------------------------------------------------
         // @{ 以计数的方式模拟实现的协程同步方式. 
@@ -124,6 +122,23 @@ class Scheduler : boost::noncopyable
         uint32_t UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wakeup_count = 1);
         // }@
         /// ------------------------------------------------------------------------
+        
+        /// ------------------------------------------------------------------------
+        // @{ 定时器
+        uint64_t ExpireAt(CoTimerMgr::TimePoint const& time_point, CoTimer::fn_t const& fn);
+
+        template <typename Duration>
+        uint64_t ExpireAt(Duration const& duration, CoTimer::fn_t const& fn)
+        {
+            return ExpireAt(CoTimerMgr::Now() + duration, fn);
+        }
+
+        bool CancelTimer(uint64_t timer_id);
+        // }@
+        /// ------------------------------------------------------------------------
+    
+    public:
+        Task* GetCurrentTask();
 
     private:
         Scheduler();
@@ -151,13 +166,16 @@ class Scheduler : boost::noncopyable
         // 获取线程局部信息
         ThreadLocalInfo& GetLocalInfo();
 
-        // list of task.
+        // List of task.
         TaskList run_tasks_;
         TaskList wait_tasks_;
 
-        // user define wait tasks table.
+        // User define wait tasks table.
         WaitTable user_wait_tasks_;
         LFLock user_wait_lock_;
+
+        // Timer manager.
+        CoTimerMgr timer_mgr_;
 
         int epoll_fd_;
         std::atomic<uint32_t> task_count_;

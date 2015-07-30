@@ -1,28 +1,8 @@
 #pragma once
-#include <atomic>
 #include <mutex>
 #include <boost/operators.hpp>
 #include <assert.h>
-
-struct LFLock
-{
-    volatile std::atomic_flag lck = ATOMIC_FLAG_INIT;
-
-    inline void lock()
-    {
-        while (std::atomic_flag_test_and_set_explicit(&lck, std::memory_order_acquire));
-    }
-
-    inline bool try_lock()
-    {
-        return !std::atomic_flag_test_and_set_explicit(&lck, std::memory_order_acquire);
-    }
-    
-    inline void unlock()
-    {
-        std::atomic_flag_clear_explicit(&lck, std::memory_order_release);
-    }
-};
+#include "spinlock.h"
 
 struct fake_lock_guard
 {
@@ -176,15 +156,16 @@ public:
         return SList<T>(first, last, this);
     }
 
-    void erase(TSQueueHook* hook)
+    bool erase(TSQueueHook* hook)
     {
-        assert(hook->check_ == (void*)this);
         LockGuard lock(lck);
+        if (hook->check_ != (void*)this) return false;
         if (hook->prev) hook->prev->next = hook->next;
         if (hook->next) hook->next->prev = hook->prev;
         else if (hook == tail_) tail_ = tail_->prev;
         hook->prev = hook->next = NULL;
         hook->check_ = NULL;
+        return true;
     }
 };
 
