@@ -3,6 +3,9 @@
 #include <boost/noncopyable.hpp>
 #include <unordered_map>
 #include <list>
+#include <sys/epoll.h>
+#include <errno.h>
+#include <string.h>
 #include "task.h"
 #include "block_object.h"
 #include "co_mutex.h"
@@ -105,7 +108,11 @@ class Scheduler : boost::noncopyable
         //  如果加入成功, 返回true, 协程将放弃执行权, 切换回调度器.
         //  如果加入失败, 返回false, 协程将继续执行.
         bool IOBlockSwitch(int fd, uint32_t event);
-        void IOBlockCancel(Task* tk, int fd);
+
+        template <typename Fdsts>
+        bool IOBlockSwitch(Fdsts const& fdsts);
+
+        void IOBlockCancel(Task* tk);
 
         /// ------------------------------------------------------------------------
         // @{ 以计数的方式模拟实现的协程同步方式. 
@@ -128,10 +135,7 @@ class Scheduler : boost::noncopyable
         uint64_t ExpireAt(CoTimerMgr::TimePoint const& time_point, CoTimer::fn_t const& fn);
 
         template <typename Duration>
-        uint64_t ExpireAt(Duration const& duration, CoTimer::fn_t const& fn)
-        {
-            return ExpireAt(CoTimerMgr::Now() + duration, fn);
-        }
+        uint64_t ExpireAt(Duration const& duration, CoTimer::fn_t const& fn);
 
         bool CancelTimer(uint64_t timer_id);
         // }@
@@ -146,6 +150,9 @@ class Scheduler : boost::noncopyable
 
         // 将一个协程加入可执行队列中
         void AddTask(Task* tk);
+
+        // 取消一个协程的IOBlock
+        void __IOBlockCancel(Task* tk);
 
         /// ------------------------------------------------------------------------
         // 协程框架定义的阻塞切换, type范围不可与用户自定义范围重叠, 指定为:[-xxxxx, -1]
@@ -163,6 +170,16 @@ class Scheduler : boost::noncopyable
         // 清理没有等待也没有被等待的WaitPair.
         void ClearWaitPairWithoutLock(int64_t type, uint64_t wait_id, WaitZone& zone, WaitPair& wait_pair);
 
+    private:
+        // Run函数的一部分, 处理runnable状态的协程
+        uint32_t DoRunnable();
+
+        // Run函数的一部分, 处理epoll相关
+        void DoEpoll();
+
+        // Run函数的一部分, 处理定时器
+        void DoTimer();
+
         // 获取线程局部信息
         ThreadLocalInfo& GetLocalInfo();
 
@@ -177,7 +194,13 @@ class Scheduler : boost::noncopyable
         // Timer manager.
         CoTimerMgr timer_mgr_;
 
+        // epoll, io block waiter.
         int epoll_fd_;
+        LFLock epoll_lock_;
+        LFLock io_cancel_tasks_lock_;
+        std::list<Task*> io_cancel_tasks_;
+
+        // total task.
         std::atomic<uint32_t> task_count_;
         std::atomic<uint32_t> runnable_task_count_;
 
@@ -186,4 +209,6 @@ class Scheduler : boost::noncopyable
 };
 
 #define g_Scheduler Scheduler::getInstance()
+
+#include "scheduler-inl.h"
 

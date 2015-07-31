@@ -1,9 +1,7 @@
 #include "scheduler.h"
 #include <ucontext.h>
 #include "error.h"
-#include <sys/epoll.h>
 #include <stdio.h>
-#include <string.h>
 #include <system_error>
 
 Scheduler& Scheduler::getInstance()
@@ -81,6 +79,20 @@ void Scheduler::Yield()
 }
 
 uint32_t Scheduler::Run()
+{
+    uint32_t do_count = DoRunnable();
+
+    // epoll
+    DoEpoll();
+
+    // timer
+    DoTimer();
+
+    return do_count;
+}
+
+// Run函数的一部分, 处理runnable状态的协程
+uint32_t Scheduler::DoRunnable()
 {
     ThreadLocalInfo& info = GetLocalInfo();
     info.current_task = NULL;
@@ -179,17 +191,47 @@ uint32_t Scheduler::Run()
         run_tasks_.push(slist);
     }
 
-    // epoll
-    static thread_local epoll_event evs[1024];
+    return do_count;
+}
+
+// Run函数的一部分, 处理epoll相关
+void Scheduler::DoEpoll()
+{
+    std::unique_lock<LFLock> epoll_lock(epoll_lock_, std::defer_lock);
+    if (!epoll_lock.try_lock())
+        return ;
+
+    static epoll_event evs[1024];
     int n = epoll_wait(epoll_fd_, evs, 1024, 1);
-    DebugPrint(dbg_scheduler, "do_count=%u, do epoll event, n = %d", do_count, n);
+    DebugPrint(dbg_scheduler, "do epoll event, n = %d", n);
     for (int i = 0; i < n; ++i)
     {
         Task* tk = (Task*)evs[i].data.ptr;
-        IOBlockCancel(tk, tk->wait_fd_);
+        __IOBlockCancel(tk);
     }
 
-    // timer
+    std::list<Task*> cancel_tasks;
+
+    {
+        std::unique_lock<LFLock> lock(io_cancel_tasks_lock_);
+        cancel_tasks.swap(io_cancel_tasks_);
+    }
+
+    for (auto &tk : cancel_tasks)
+        __IOBlockCancel(tk);
+
+    // 由于epoll_wait的结果中会残留一些未计数的Task*,
+    //     epoll的性质决定了这些Task无法计数, 
+    //     所以这个析构的操作一定要在epoll_lock的保护中做
+    Task::DeleteList delete_list;
+    Task::SwapDeleteList(delete_list);
+    for (auto &tk : delete_list)
+        delete tk;
+}
+
+// Run函数的一部分, 处理定时器
+void Scheduler::DoTimer()
+{
     std::vector<std::shared_ptr<CoTimer>> timers;
     timer_mgr_.GetExpired(timers, 128);
     for (auto &sp_timer : timers)
@@ -198,8 +240,6 @@ uint32_t Scheduler::Run()
         (*sp_timer)();
         DebugPrint(dbg_timer, "leave timer callback %llu", (long long unsigned)sp_timer->GetId());
     }
-
-    return do_count;
 }
 
 void Scheduler::RunLoop()
@@ -250,33 +290,31 @@ Task* Scheduler::GetCurrentTask()
 
 bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
-    // TODO: 支持同一个fd被多个协程等待
-    if (!IsCoroutine()) return false;
-    Task* tk = GetLocalInfo().current_task;
-    epoll_event ev = {event, {(void*)tk}};
-    if (-1 == epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fd, &ev)) {
-        fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
-        return false;
-    }
-
-    tk->wait_fd_ = fd;
-    tk->state_ = TaskState::io_block;
-    tk->IncrementRef();     // epoll use ref.
-    DebugPrint(dbg_ioblock, "task(%s) io_block. wait_fd=%d", tk->DebugInfo(), tk->wait_fd_);
-    Yield();
-    return true;
+    FdStruct fdst[1] = {fd, event};
+    return IOBlockSwitch(fdst);
 }
 
-void Scheduler::IOBlockCancel(Task* tk, int fd)
+void Scheduler::IOBlockCancel(Task* tk)
 {
-    if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, NULL)) {
-        DebugPrint(dbg_ioblock, "task(%s) io_block wakeup. wait_fd=%d", tk->DebugInfo(), tk->wait_fd_);
-        if (wait_tasks_.erase(tk)) {
-            tk->wait_fd_ = -1;
-            AddTask(tk);
-        }
+    std::unique_lock<LFLock> lock(io_cancel_tasks_lock_);
+    io_cancel_tasks_.push_back(tk);
+}
 
-        tk->DecrementRef();     // epoll use ref.
+void Scheduler::__IOBlockCancel(Task* tk)
+{
+    if (wait_tasks_.erase(tk)) { // sync between timer and epoll.
+        AddTask(tk);
+        DebugPrint(dbg_ioblock, "task(%s) io_block wakeup.", tk->DebugInfo());
+
+        // 同时清理其他fd, 即每次只返回一个fd可读or可写.
+        for (auto &fdst: tk->wait_fds_)
+        {
+            if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL)) {   // sync 1
+                DebugPrint(dbg_ioblock, "task(%s) io_block clear fd=%d", tk->DebugInfo(), fdst.fd);
+                // 减引用计数的条件：谁成功从epoll中删除了一个fd，谁才能减引用计数。
+                tk->DecrementRef(); // epoll use ref.
+            }
+        }
     }
 }
 

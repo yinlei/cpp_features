@@ -15,7 +15,7 @@ void foo()
         return ;
     }
 
-    struct timeval rcvtimeout = {5, 0};
+    struct timeval rcvtimeout = {1, 0};
     if (-1 == setsockopt(socketfd, SOL_SOCKET,
                 SO_RCVTIMEO, &rcvtimeout, sizeof(rcvtimeout)))
     {

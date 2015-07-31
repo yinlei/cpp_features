@@ -1,5 +1,6 @@
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include "scheduler.h"
@@ -32,7 +33,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
                         timeout.tv_usec};
                     tk->IncrementRef(); // timer use ref.
                     timer_id = g_Scheduler.ExpireAt(duration, [=]{
-                            g_Scheduler.IOBlockCancel(tk, fd);
+                            g_Scheduler.IOBlockCancel(tk);
                             tk->DecrementRef(); // timer use ref.
                             });
                 }
@@ -78,6 +79,9 @@ static write_t write_f = NULL;
 
 typedef ssize_t(*writev_t)(int, const struct iovec *, int);
 static writev_t writev_f = NULL;
+
+typedef int(*poll_t)(struct pollfd *fds, nfds_t nfds, int timeout);
+static poll_t poll_f = NULL;
 
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
@@ -155,12 +159,20 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     return read_write_mode(fd, writev_f, "writev", EPOLLOUT, SO_SNDTIMEO, iov, iovcnt);
 }
 
+int poll(struct pollfd *fds, nfds_t nfds, int timeout)
+{
+    DebugPrint(dbg_hook, "hook poll. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
+    // TODO, hook this function to nonblocking within coroutine.
+    return poll_f(fds, nfds, timeout);
+}
+
 #if !defined(CO_DYNAMIC_LINK)
 extern int __connect(int fd, const struct sockaddr *addr, socklen_t addrlen);
 extern ssize_t __read(int fd, void *buf, size_t count);
 extern ssize_t __readv(int fd, const struct iovec *iov, int iovcnt);
 extern ssize_t __write(int fd, const void *buf, size_t count);
 extern ssize_t __writev(int fd, const struct iovec *iov, int iovcnt);
+extern int __poll(struct pollfd *fds, nfds_t nfds, int timeout);
 #endif
 }
 
@@ -172,12 +184,14 @@ void coroutine_hook_init()
     readv_f = (readv_t)dlsym(RTLD_NEXT, "readv");
     write_f = (write_t)dlsym(RTLD_NEXT, "write");
     writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
+    poll_f = (poll_t)dlsym(RTLD_NEXT, "poll");
 #else
     connect_f = &__connect;
     read_f = &__read;
     readv_f = &__readv;
     write_f = &__write;
     writev_f = &__writev;
+    poll_f = &__poll;
 #endif
 
     if (!connect_f || !read_f || !write_f || !readv_f || !writev_f) {
