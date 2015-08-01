@@ -2,7 +2,6 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
-#include <boost/thread.hpp>
 #include <gtest/gtest.h>
 #include "coroutine.h"
 using namespace std;
