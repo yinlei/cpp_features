@@ -35,7 +35,7 @@ int main(int argc, char** argv)
 
     printf("go\n");
     {
-        boost::progress_timer pt;
+        auto start = std::chrono::high_resolution_clock::now();
         boost::thread_group tg;
         for (int i = 0; i < thread_count; ++i)
         {
@@ -48,8 +48,10 @@ int main(int argc, char** argv)
                 });
         }
         tg.join_all();
-        printf("%d threads, run %d coroutines, %d times switch. cost ",
-                thread_count, co_count, co_count * switch_per_co);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        printf("%d threads, run %d coroutines, %d times switch. cost %d ms\n",
+                thread_count, co_count, co_count * switch_per_co, (int)milli);
     }
     printf("%d\nend\n", (int)g_value);
     return 0;
