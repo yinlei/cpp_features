@@ -71,6 +71,7 @@ void Scheduler::Yield()
     if (!tk) return ;
 
     DebugPrint(dbg_yield, "yield task(%s) state=%d", tk->DebugInfo(), tk->state_);
+    ++tk->yield_count_;
     int ret = swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
     if (ret) {
         fprintf(stderr, "swapcontext error:%s\n", strerror(errno));
@@ -89,6 +90,13 @@ uint32_t Scheduler::Run()
     DoTimer();
 
     return do_count;
+}
+
+void Scheduler::RunUntilNoTask()
+{
+    do { 
+        Run();
+    } while (!IsEmpty());
 }
 
 // Run函数的一部分, 处理runnable状态的协程
@@ -180,7 +188,7 @@ uint32_t Scheduler::DoRunnable()
                     --task_count_;
                     --runnable_task_count_;
                     it = slist.erase(it);
-                    DebugPrint(dbg_task, "task(%s) released.", tk->DebugInfo());
+                    DebugPrint(dbg_task, "task(%s) done.", tk->DebugInfo());
                     if (tk->eptr_) {
                         std::exception_ptr ep = tk->eptr_;
                         run_tasks_.push(slist);
@@ -211,7 +219,9 @@ void Scheduler::DoEpoll()
     std::list<Task*> cancel_tasks;
     for (int i = 0; i < n; ++i)
     {
-        Task* tk = (Task*)evs[i].data.ptr;
+        EpollPtr* ep = (EpollPtr*)evs[i].data.ptr;
+        ep->revent = evs[i].events;
+        Task* tk = ep->tk;
         ++tk->wait_successful_;
         // 将tk暂存, 最后再执行__IOBlockCancel, 是为了poll和select可以得到正确的计数。
         // 以防Task被加入runnable列表后，被其他线程执行
@@ -235,8 +245,10 @@ void Scheduler::DoEpoll()
     //     所以这个析构的操作一定要在epoll_lock的保护中做
     Task::DeleteList delete_list;
     Task::SwapDeleteList(delete_list);
-    for (auto &tk : delete_list)
+    for (auto &tk : delete_list) {
+        DebugPrint(dbg_task, "task(%s) delete.", tk->DebugInfo());
         delete tk;
+    }
 }
 
 // Run函数的一部分, 处理定时器
@@ -281,6 +293,12 @@ uint64_t Scheduler::GetCurrentTaskID()
     return tk ? tk->id_ : 0;
 }
 
+uint64_t Scheduler::GetCurrentTaskYieldCount()
+{
+    Task* tk = GetLocalInfo().current_task;
+    return tk ? tk->yield_count_ : 0;
+}
+
 void Scheduler::SetCurrentTaskDebugInfo(std::string const& info)
 {
     Task* tk = GetLocalInfo().current_task;
@@ -301,7 +319,9 @@ Task* Scheduler::GetCurrentTask()
 
 void Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
-    FdStruct fdst[1] = {{fd, event}};
+    FdStruct fdst[1];
+    fdst[0].fd = fd;
+    fdst[0].event = event;
     IOBlockSwitch(fdst);
 }
 
@@ -314,24 +334,36 @@ void Scheduler::IOBlockCancel(Task* tk)
 bool Scheduler::__IOBlockSwitch(Task* tk)
 {
     bool ok = false;
+    std::unique_lock<LFLock> lock(tk->io_block_lock_, std::defer_lock);
+    if (tk->wait_fds_.size() > 1)
+        lock.lock();
+
     for (auto &fdst : tk->wait_fds_)
     {
-        epoll_event ev = {fdst.event, {(void*)tk}};
+        epoll_event ev = {fdst.event, {(void*)&fdst.epoll_ptr}};
+        tk->IncrementRef();     // 先将引用计数加一, 以防另一个线程立刻epoll_wait成功被执行完线程.
         if (-1 == epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fdst.fd, &ev)) {
-            fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
-            // 某个fd添加失败, 回滚
-            for (auto &fdst : tk->wait_fds_)
-            {
-                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL);
-                tk->DecrementRef();
-                DebugPrint(dbg_ioblock, "task(%s) delete io_block. fd=%d", tk->DebugInfo(), fdst.fd);
+            tk->DecrementRef(); // 添加失败时, 回退刚刚增加的引用计数.
+            if (errno == EEXIST) {
+                fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
+                // 某个fd添加失败, 回滚
+                for (auto &fdst : tk->wait_fds_)
+                {
+                    if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL)) {
+                        DebugPrint(dbg_ioblock, "task(%s) rollback io_block. fd=%d", tk->DebugInfo(), fdst.fd);
+                        // 减引用计数的条件：谁成功从epoll中删除了一个fd，谁才能减引用计数。
+                        tk->DecrementRef();
+                    }
+                }
+                ok = false;
+                break;
             }
-            ok = false;
-            break;
+
+            // 其他原因添加失败, 忽略即可.(模拟poll逻辑)
+            continue;
         }
 
         ok = true;
-        tk->IncrementRef();     // epoll use ref.
         DebugPrint(dbg_ioblock, "task(%s) io_block. fd=%d, ev=%d",
                 tk->DebugInfo(), fdst.fd, fdst.event);
     }
@@ -343,6 +375,10 @@ void Scheduler::__IOBlockCancel(Task* tk)
 {
     if (wait_tasks_.erase(tk)) { // sync between timer and epoll.
         DebugPrint(dbg_ioblock, "task(%s) io_block wakeup.", tk->DebugInfo());
+
+        std::unique_lock<LFLock> lock(tk->io_block_lock_, std::defer_lock);
+        if (tk->wait_fds_.size() > 1)
+            lock.lock();
 
         // 清理所有fd
         for (auto &fdst: tk->wait_fds_)

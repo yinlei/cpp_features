@@ -4,6 +4,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include "scheduler.h"
+#include <assert.h>
 
 template <typename OriginF, typename ... Args>
 ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
@@ -38,7 +39,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
                             });
                 }
             }
-            
+
             // add into epoll, and switch other context.
             g_Scheduler.IOBlockSwitch(fd, event);
             if (timer_id && g_Scheduler.CancelTimer(timer_id))
@@ -48,7 +49,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
                 fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
                 return fn(fd, std::forward<Args>(args)...);
             }
-            
+
             DebugPrint(dbg_hook, "continue task(%s) %s. fd=%d", g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
             n = fn(fd, std::forward<Args>(args)...);
         } else {
@@ -120,10 +121,10 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             errno = e;
             return n;
         }
-        
+
         DebugPrint(dbg_hook, "continue task(%s) connect. fd=%d", g_Scheduler.GetCurrentTaskDebugInfo(), fd);
-        int error = 0;  
-        socklen_t len = sizeof(int);  
+        int error = 0;
+        socklen_t len = sizeof(int);
         if (0 == getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &len)) {
             if (0 == error) {
                 fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
@@ -165,11 +166,82 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     return read_write_mode(fd, writev_f, "writev", EPOLLOUT, SO_SNDTIMEO, iov, iovcnt);
 }
 
+static uint32_t PollEvent2Epoll(short events)
+{
+    uint32_t e = 0;
+    if (events & POLLIN)   e |= EPOLLIN;
+    if (events & POLLOUT)  e |= EPOLLOUT;
+    if (events & POLLHUP)  e |= EPOLLHUP;
+    if (events & POLLERR)  e |= EPOLLERR;
+    return e;
+}
+
+static short EpollEvent2Poll(uint32_t events)
+{
+    short e = 0;
+    if (events & EPOLLIN)  e |= POLLIN;
+    if (events & EPOLLOUT) e |= POLLOUT;
+    if (events & EPOLLHUP) e |= POLLHUP;
+    if (events & EPOLLERR) e |= POLLERR;
+    return e;
+}
+
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
     DebugPrint(dbg_hook, "hook poll. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
-    // TODO, hook this function to nonblocking within coroutine.
-    return poll_f(fds, nfds, timeout);
+
+    if (!g_Scheduler.IsCoroutine())
+        return poll_f(fds, nfds, timeout);
+
+    if (timeout == 0)
+        return poll_f(fds, nfds, timeout);
+
+    Task* tk = g_Scheduler.GetCurrentTask();
+    uint32_t timer_id = 0;
+    if (timeout != -1) {
+        std::chrono::milliseconds duration{timeout};
+        tk->IncrementRef(); // timer use ref.
+        timer_id = g_Scheduler.ExpireAt(duration, [=]{
+                g_Scheduler.IOBlockCancel(tk);
+                tk->DecrementRef(); // timer use ref.
+                });
+    }
+
+    std::vector<FdStruct> fdsts;
+    for (nfds_t i = 0; i < nfds; ++i) {
+        fdsts.emplace_back();
+        fdsts.back().fd = fds[i].fd;
+        fdsts.back().event = PollEvent2Epoll(fds[i].events);
+    }
+
+    // add into epoll, and switch other context.
+    g_Scheduler.IOBlockSwitch(fdsts);
+    bool is_timeout = false; // 是否超时
+    if (timer_id) {
+        is_timeout = true;
+        if (g_Scheduler.CancelTimer(timer_id)) {
+            tk->DecrementRef(); // timer use ref.
+            is_timeout = false;
+        }
+    }
+
+    if (tk->wait_successful_ == 0) {
+        if (is_timeout)
+            return 0;
+        else
+            return poll_f(fds, nfds, 0);
+    }
+
+    int n = 0;
+    for (int i = 0; i < (int)tk->wait_fds_.size(); ++i)
+    {
+        fds[i].revents = EpollEvent2Poll(tk->wait_fds_[i].epoll_ptr.revent);
+        if (fds[i].revents) ++n;
+    }
+
+    assert(n == (int)tk->wait_successful_);
+
+    return n;
 }
 
 #if !defined(CO_DYNAMIC_LINK)

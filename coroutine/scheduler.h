@@ -84,6 +84,9 @@ class Scheduler : boost::noncopyable
 
         // 调度器调度函数, 内部执行协程、调度协程
         uint32_t Run();
+
+        // 循环Run直到没有协程为止
+        void RunUntilNoTask();
         
         // 无限循环执行Run
         void RunLoop();
@@ -97,6 +100,9 @@ class Scheduler : boost::noncopyable
         // 当前协程ID, ID从1开始（不再协程中则返回0）
         uint64_t GetCurrentTaskID();
 
+        // 当前协程切换的次数
+        uint64_t GetCurrentTaskYieldCount();
+
         // 设置当前协程调试信息, 打印调试信息时将回显
         void SetCurrentTaskDebugInfo(std::string const& info);
 
@@ -108,7 +114,7 @@ class Scheduler : boost::noncopyable
         void IOBlockSwitch(int fd, uint32_t event);
 
         template <typename Fdsts>
-        void IOBlockSwitch(Fdsts const& fdsts);
+        void IOBlockSwitch(Fdsts & fdsts);
 
         void IOBlockCancel(Task* tk);
 

@@ -1,7 +1,7 @@
 // Inline scheduler member functions.
 
 template <typename Fdsts>
-void Scheduler::IOBlockSwitch(Fdsts const& fdsts)
+void Scheduler::IOBlockSwitch(Fdsts & fdsts)
 {
     // TODO: 支持同一个fd被多个协程等待
     if (!IsCoroutine()) return ;
@@ -10,6 +10,7 @@ void Scheduler::IOBlockSwitch(Fdsts const& fdsts)
     tk->wait_fds_.clear();
     tk->wait_successful_ = 0;
     for (auto &fdst : fdsts) {
+        fdst.epoll_ptr.tk = tk;
         tk->wait_fds_.push_back(fdst);
     }
 
