@@ -39,6 +39,7 @@ struct Task
     std::exception_ptr eptr_;           // 保存exception的指针
     std::atomic<uint32_t> ref_count_;   // 引用计数
     std::vector<FdStruct> wait_fds_;    // io_block等待的fd列表
+    uint32_t wait_successful_;          // io_block成功等待到的fd数量(用于poll和select)
     int64_t user_wait_type_;            // user_block等待的类型
     uint64_t user_wait_id_;             // user_block等待的id
     BlockObject* block_;                // sys_block等待的block对象

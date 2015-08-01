@@ -105,12 +105,10 @@ class Scheduler : boost::noncopyable
 
     public:
         /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
-        //  如果加入成功, 返回true, 协程将放弃执行权, 切换回调度器.
-        //  如果加入失败, 返回false, 协程将继续执行.
-        bool IOBlockSwitch(int fd, uint32_t event);
+        void IOBlockSwitch(int fd, uint32_t event);
 
         template <typename Fdsts>
-        bool IOBlockSwitch(Fdsts const& fdsts);
+        void IOBlockSwitch(Fdsts const& fdsts);
 
         void IOBlockCancel(Task* tk);
 
@@ -149,7 +147,10 @@ class Scheduler : boost::noncopyable
         ~Scheduler();
 
         // 将一个协程加入可执行队列中
-        void AddTask(Task* tk);
+        void AddTaskRunnable(Task* tk);
+
+        // 将一个协程等待的fd全部加入epoll中
+        bool __IOBlockSwitch(Task* tk);
 
         // 取消一个协程的IOBlock
         void __IOBlockCancel(Task* tk);

@@ -72,7 +72,7 @@ bool BlockObject::Wakeup()
         return true;
     }
 
-    g_Scheduler.AddTask(tk);
+    g_Scheduler.AddTaskRunnable(tk);
     DebugPrint(dbg_syncblock, "wakeup task(%s).", tk->DebugInfo());
     return true;
 }

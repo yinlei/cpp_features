@@ -40,11 +40,11 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
             }
             
             // add into epoll, and switch other context.
-            bool switched = g_Scheduler.IOBlockSwitch(fd, event);
+            g_Scheduler.IOBlockSwitch(fd, event);
             if (timer_id && g_Scheduler.CancelTimer(timer_id))
                 tk->DecrementRef(); // timer use ref.
 
-            if (!switched) {
+            if (tk->wait_successful_ == 0) {
                 fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
                 return fn(fd, std::forward<Args>(args)...);
             }
@@ -108,8 +108,14 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
             errno = e;
             return n;
-        } else if (!g_Scheduler.IOBlockSwitch(fd, EPOLLOUT)) {
+        } else {
             // add into epoll, and switch other context.
+            g_Scheduler.IOBlockSwitch(fd, EPOLLOUT);
+        }
+
+        Task* tk = g_Scheduler.GetCurrentTask();
+        if (tk->wait_successful_ == 0) {
+            // 添加到epoll中失败了
             fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
             errno = e;
             return n;

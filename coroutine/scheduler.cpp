@@ -52,7 +52,7 @@ void Scheduler::CreateTask(TaskF const& fn)
 
     ++task_count_;
     DebugPrint(dbg_task, "task(%s) created.", tk->DebugInfo());
-    AddTask(tk);
+    AddTaskRunnable(tk);
 }
 
 bool Scheduler::IsCoroutine()
@@ -139,6 +139,10 @@ uint32_t Scheduler::DoRunnable()
                     --runnable_task_count_;
                     it = slist.erase(it);
                     wait_tasks_.push(tk);
+                    if (!__IOBlockSwitch(tk)) {
+                        if (wait_tasks_.erase(tk))
+                            AddTaskRunnable(tk);
+                    }
                     break;
 
                 case TaskState::sys_block:
@@ -204,15 +208,21 @@ void Scheduler::DoEpoll()
     static epoll_event evs[1024];
     int n = epoll_wait(epoll_fd_, evs, 1024, 1);
     DebugPrint(dbg_scheduler, "do epoll event, n = %d", n);
+    std::list<Task*> cancel_tasks;
     for (int i = 0; i < n; ++i)
     {
         Task* tk = (Task*)evs[i].data.ptr;
-        __IOBlockCancel(tk);
+        ++tk->wait_successful_;
+        // 将tk暂存, 最后再执行__IOBlockCancel, 是为了poll和select可以得到正确的计数。
+        // 以防Task被加入runnable列表后，被其他线程执行
+        cancel_tasks.push_back(tk);     
     }
 
-    std::list<Task*> cancel_tasks;
+    for (auto &tk : cancel_tasks)
+        __IOBlockCancel(tk);
 
     {
+        cancel_tasks.clear();
         std::unique_lock<LFLock> lock(io_cancel_tasks_lock_);
         cancel_tasks.swap(io_cancel_tasks_);
     }
@@ -247,9 +257,10 @@ void Scheduler::RunLoop()
     for (;;) Run();
 }
 
-void Scheduler::AddTask(Task* tk)
+void Scheduler::AddTaskRunnable(Task* tk)
 {
     DebugPrint(dbg_scheduler, "Add task(%s) to runnable list.", tk->DebugInfo());
+    tk->state_ = TaskState::runnable;
     run_tasks_.push(tk);
     ++runnable_task_count_;
 }
@@ -288,10 +299,10 @@ Task* Scheduler::GetCurrentTask()
     return GetLocalInfo().current_task;
 }
 
-bool Scheduler::IOBlockSwitch(int fd, uint32_t event)
+void Scheduler::IOBlockSwitch(int fd, uint32_t event)
 {
-    FdStruct fdst[1] = {fd, event};
-    return IOBlockSwitch(fdst);
+    FdStruct fdst[1] = {{fd, event}};
+    IOBlockSwitch(fdst);
 }
 
 void Scheduler::IOBlockCancel(Task* tk)
@@ -300,13 +311,40 @@ void Scheduler::IOBlockCancel(Task* tk)
     io_cancel_tasks_.push_back(tk);
 }
 
+bool Scheduler::__IOBlockSwitch(Task* tk)
+{
+    bool ok = false;
+    for (auto &fdst : tk->wait_fds_)
+    {
+        epoll_event ev = {fdst.event, {(void*)tk}};
+        if (-1 == epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fdst.fd, &ev)) {
+            fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
+            // 某个fd添加失败, 回滚
+            for (auto &fdst : tk->wait_fds_)
+            {
+                epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL);
+                tk->DecrementRef();
+                DebugPrint(dbg_ioblock, "task(%s) delete io_block. fd=%d", tk->DebugInfo(), fdst.fd);
+            }
+            ok = false;
+            break;
+        }
+
+        ok = true;
+        tk->IncrementRef();     // epoll use ref.
+        DebugPrint(dbg_ioblock, "task(%s) io_block. fd=%d, ev=%d",
+                tk->DebugInfo(), fdst.fd, fdst.event);
+    }
+
+    return ok;
+}
+
 void Scheduler::__IOBlockCancel(Task* tk)
 {
     if (wait_tasks_.erase(tk)) { // sync between timer and epoll.
-        AddTask(tk);
         DebugPrint(dbg_ioblock, "task(%s) io_block wakeup.", tk->DebugInfo());
 
-        // 同时清理其他fd, 即每次只返回一个fd可读or可写.
+        // 清理所有fd
         for (auto &fdst: tk->wait_fds_)
         {
             if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL)) {   // sync 1
@@ -315,6 +353,8 @@ void Scheduler::__IOBlockCancel(Task* tk)
                 tk->DecrementRef(); // epoll use ref.
             }
         }
+
+        AddTaskRunnable(tk);
     }
 }
 
@@ -403,7 +443,7 @@ uint32_t Scheduler::BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_
         Task *tk = &task;
         DebugPrint(dbg_wait, "%s wakeup task(%s). wait_type=%lld, wait_id=%llu",
                 type < 0 ? "sys_block" : "user_block", tk->DebugInfo(), (long long int)type, (long long unsigned)wait_id);
-        AddTask(tk);
+        AddTaskRunnable(tk);
     }
 
     DebugPrint(dbg_wait, "%s wakeup %u tasks, domain wakeup=%u. wait_type=%lld, wait_id=%llu",
