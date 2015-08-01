@@ -1,7 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -g -Wall
-TARGET=simple.t nthread.t 1thread.t sleep.t hiredis.t s_hiredis.t mutex.t nmutex.t
-#OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
+TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp))
 OBJS=$(patsubst %, %.o, $(TARGET))
 
 all : $(TARGET)
@@ -25,4 +24,4 @@ hiredis.t: hiredis.o
 .PHONY: clean
 
 clean:
-	rm *.o $(TARGET) -f
+	rm *.o *.t -f

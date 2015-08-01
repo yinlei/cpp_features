@@ -31,6 +31,7 @@ static const uint64_t dbg_wait = 0x1 << 6;
 static const uint64_t dbg_exception = 0x1 << 7;
 static const uint64_t dbg_syncblock = 0x1 << 8;
 static const uint64_t dbg_timer = 0x1 << 9;
+static const uint64_t dbg_sleep = 0x1 << 10;
 ///-------------------
 
 enum class eCoExHandle : uint8_t
@@ -182,10 +183,10 @@ class Scheduler : boost::noncopyable
         uint32_t DoRunnable();
 
         // Run函数的一部分, 处理epoll相关
-        void DoEpoll();
+        int DoEpoll();
 
         // Run函数的一部分, 处理定时器
-        void DoTimer();
+        uint32_t DoTimer();
 
         // 获取线程局部信息
         ThreadLocalInfo& GetLocalInfo();

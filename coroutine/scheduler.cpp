@@ -81,15 +81,20 @@ void Scheduler::Yield()
 
 uint32_t Scheduler::Run()
 {
-    uint32_t do_count = DoRunnable();
+    uint32_t run_count = DoRunnable();
 
     // epoll
-    DoEpoll();
+    int ep_count = DoEpoll();
 
     // timer
-    DoTimer();
+    uint32_t tm_count = DoTimer();
 
-    return do_count;
+    if (!run_count && ep_count <= 0 && !tm_count) {
+        DebugPrint(dbg_sleep, "usleep(10)");
+        usleep(10);
+    }
+
+    return run_count;
 }
 
 void Scheduler::RunUntilNoTask()
@@ -207,14 +212,19 @@ uint32_t Scheduler::DoRunnable()
 }
 
 // Run函数的一部分, 处理epoll相关
-void Scheduler::DoEpoll()
+int Scheduler::DoEpoll()
 {
     std::unique_lock<LFLock> epoll_lock(epoll_lock_, std::defer_lock);
     if (!epoll_lock.try_lock())
-        return ;
+        return -1;
 
     static epoll_event evs[1024];
-    int n = epoll_wait(epoll_fd_, evs, 1024, 1);
+retry:
+    int n = epoll_wait(epoll_fd_, evs, 1024, 0);
+    if (n == -1)
+        if (errno == EAGAIN)
+            goto retry;
+
     DebugPrint(dbg_scheduler, "do epoll event, n = %d", n);
     std::list<Task*> cancel_tasks;
     for (int i = 0; i < n; ++i)
@@ -249,10 +259,12 @@ void Scheduler::DoEpoll()
         DebugPrint(dbg_task, "task(%s) delete.", tk->DebugInfo());
         delete tk;
     }
+
+    return n;
 }
 
 // Run函数的一部分, 处理定时器
-void Scheduler::DoTimer()
+uint32_t Scheduler::DoTimer()
 {
     std::vector<std::shared_ptr<CoTimer>> timers;
     timer_mgr_.GetExpired(timers, 128);
@@ -262,6 +274,8 @@ void Scheduler::DoTimer()
         (*sp_timer)();
         DebugPrint(dbg_timer, "leave timer callback %llu", (long long unsigned)sp_timer->GetId());
     }
+
+    return timers.size();
 }
 
 void Scheduler::RunLoop()
