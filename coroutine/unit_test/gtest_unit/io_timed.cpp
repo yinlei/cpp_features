@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <gtest/gtest.h>
+#include "test_server.h"
 #include "coroutine.h"
 using namespace std;
 
@@ -24,38 +25,30 @@ void foo()
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(22);
+    addr.sin_port = htons(43222);
     addr.sin_addr.s_addr = inet_addr("127.0.0.1");
     if (-1 == connect(socketfd, (sockaddr*)&addr, sizeof(addr))) {
         perror("connect error:");
         return ;
     }
 
+    uint32_t yield_count = g_Scheduler.GetCurrentTaskYieldCount();
     char buf[1024] = {};
-    for (int i = 0; i < 2; ++i)
-    {
-        ssize_t n = read(socketfd, buf, sizeof(buf));
-        if (n == 0) {
-            printf("disconnected.\n");
-        } else if (n < 0) {
-            if (errno == EAGAIN) {
-                printf("read error is EAGAIN.\n");
-            } else {
-                perror("read error:");
-            }
-        } else {
-            printf("read %d bytes.\n", (int)n);
-        }
-    }
+    auto start = std::chrono::high_resolution_clock::now();
+    ssize_t n = read(socketfd, buf, sizeof(buf));
+    auto end = std::chrono::high_resolution_clock::now();
+    auto milli = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_EQ(n, -1);
+    EXPECT_EQ(errno, EAGAIN);
+    EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), yield_count + 1);
+    EXPECT_LT(milli, 1100);
+    EXPECT_GT(milli, 1000);
 }
 
 TEST(IOTimed, Main)
 {
-    g_Scheduler.GetOptions().debug = dbg_all;
+//    g_Scheduler.GetOptions().debug = dbg_hook;
     go foo;
-    cout << "go" << endl;
-    while (!g_Scheduler.IsEmpty())
-        g_Scheduler.Run();
-    cout << "end" << endl;
+    g_Scheduler.RunUntilNoTask();
 }
 

@@ -30,8 +30,10 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
             socklen_t timeout_blen = sizeof(timeout);
             if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
                 if (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
-                    std::chrono::microseconds duration{timeout.tv_sec * 1000 * 1000 +
-                        timeout.tv_usec};
+                    std::chrono::milliseconds duration{timeout.tv_sec * 1000 +
+                        timeout.tv_usec / 1000};
+                    DebugPrint(dbg_hook, "hook task(%s) %s timeout=%dms. fd=%d",
+                            g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, (int)duration.count(), fd);
                     tk->IncrementRef(); // timer use ref.
                     timer_id = g_Scheduler.ExpireAt(duration, [=]{
                             g_Scheduler.IOBlockCancel(tk);
@@ -42,12 +44,24 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
 
             // add into epoll, and switch other context.
             g_Scheduler.IOBlockSwitch(fd, event);
-            if (timer_id && g_Scheduler.CancelTimer(timer_id))
-                tk->DecrementRef(); // timer use ref.
+            bool is_timeout = false;
+            if (timer_id) {
+                is_timeout = true;
+                if (g_Scheduler.CancelTimer(timer_id)) {
+                    is_timeout = false;
+                    tk->DecrementRef(); // timer use ref.
+                }
+            }
 
             if (tk->wait_successful_ == 0) {
-                fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-                return fn(fd, std::forward<Args>(args)...);
+                if (is_timeout) {
+                    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+                    errno = EAGAIN;
+                    return -1;
+                } else {
+                    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+                    return fn(fd, std::forward<Args>(args)...);
+                }
             }
 
             DebugPrint(dbg_hook, "continue task(%s) %s. fd=%d", g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
