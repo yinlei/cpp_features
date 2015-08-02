@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-std=c++11 -g -Wall
 INCLUDE=-I..
-LINK=-lcoroutine -ldl -L.. -lboost_thread -lboost_system -lpthread
+LINK=-L.. -lcoroutine -ldl -lboost_thread -lboost_system -lpthread
 STATIC=-static -static-libgcc -static-libstdc++
 TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp)) $(patsubst %.cpp, s_%.t, $(wildcard *.cpp))
 

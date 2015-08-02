@@ -89,11 +89,31 @@ static read_t read_f = NULL;
 typedef ssize_t(*readv_t)(int, const struct iovec *, int);
 static readv_t readv_f = NULL;
 
+typedef ssize_t(*recv_t)(int sockfd, void *buf, size_t len, int flags);
+static recv_t recv_f = NULL;
+
+typedef ssize_t(*recvfrom_t)(int sockfd, void *buf, size_t len, int flags,
+        struct sockaddr *src_addr, socklen_t *addrlen);
+static recvfrom_t recvfrom_f = NULL;
+
+typedef ssize_t(*recvmsg_t)(int sockfd, struct msghdr *msg, int flags);
+static recvmsg_t recvmsg_f = NULL;
+
 typedef ssize_t(*write_t)(int, const void *, size_t);
 static write_t write_f = NULL;
 
 typedef ssize_t(*writev_t)(int, const struct iovec *, int);
 static writev_t writev_f = NULL;
+
+typedef ssize_t(*send_t)(int sockfd, const void *buf, size_t len, int flags);
+static send_t send_f = NULL;
+
+typedef ssize_t(*sendto_t)(int sockfd, const void *buf, size_t len, int flags,
+        const struct sockaddr *dest_addr, socklen_t addrlen);
+static sendto_t sendto_f = NULL;
+
+typedef ssize_t(*sendmsg_t)(int sockfd, const struct msghdr *msg, int flags);
+static sendmsg_t sendmsg_f = NULL;
 
 typedef int(*poll_t)(struct pollfd *fds, nfds_t nfds, int timeout);
 static poll_t poll_f = NULL;
@@ -162,6 +182,10 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
     }
 }
 
+int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    return read_write_mode(sockfd, accept_f, "accept", EPOLLIN, SO_RCVTIMEO, addr, addrlen);
+}
 
 ssize_t read(int fd, void *buf, size_t count)
 {
@@ -171,6 +195,23 @@ ssize_t read(int fd, void *buf, size_t count)
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
     return read_write_mode(fd, readv_f, "readv", EPOLLIN, SO_RCVTIMEO, iov, iovcnt);
+}
+
+ssize_t recv(int sockfd, void *buf, size_t len, int flags)
+{
+    return read_write_mode(sockfd, recv_f, "recv", EPOLLIN, SO_RCVTIMEO, buf, len, flags);
+}
+
+ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
+        struct sockaddr *src_addr, socklen_t *addrlen)
+{
+    return read_write_mode(sockfd, recvfrom_f, "recvfrom", EPOLLIN, SO_RCVTIMEO, buf, len, flags,
+            src_addr, addrlen);
+}
+
+ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
+{
+    return read_write_mode(sockfd, recvmsg_f, "recvmsg", EPOLLIN, SO_RCVTIMEO, msg, flags);
 }
 
 ssize_t write(int fd, const void *buf, size_t count)
@@ -183,9 +224,21 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
     return read_write_mode(fd, writev_f, "writev", EPOLLOUT, SO_SNDTIMEO, iov, iovcnt);
 }
 
-int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
-    return read_write_mode(sockfd, accept_f, "accept", EPOLLIN, SO_RCVTIMEO, addr, addrlen);
+    return read_write_mode(sockfd, send_f, "send", EPOLLOUT, SO_SNDTIMEO, buf, len, flags);
+}
+
+ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
+        const struct sockaddr *dest_addr, socklen_t addrlen)
+{
+    return read_write_mode(sockfd, sendto_f, "sendto", EPOLLOUT, SO_SNDTIMEO, buf, len, flags,
+            dest_addr, addrlen);
+}
+
+ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
+{
+    return read_write_mode(sockfd, sendmsg_f, "sendmsg", EPOLLOUT, SO_SNDTIMEO, msg, flags);
 }
 
 static uint32_t PollEvent2Epoll(short events)
@@ -270,8 +323,16 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 extern int __connect(int fd, const struct sockaddr *addr, socklen_t addrlen);
 extern ssize_t __read(int fd, void *buf, size_t count);
 extern ssize_t __readv(int fd, const struct iovec *iov, int iovcnt);
+extern ssize_t __recv(int sockfd, void *buf, size_t len, int flags);
+extern ssize_t __recvfrom(int sockfd, void *buf, size_t len, int flags,
+        struct sockaddr *src_addr, socklen_t *addrlen);
+extern ssize_t __recvmsg(int sockfd, struct msghdr *msg, int flags);
 extern ssize_t __write(int fd, const void *buf, size_t count);
 extern ssize_t __writev(int fd, const struct iovec *iov, int iovcnt);
+extern ssize_t __send(int sockfd, const void *buf, size_t len, int flags);
+extern ssize_t __sendto(int sockfd, const void *buf, size_t len, int flags,
+        const struct sockaddr *dest_addr, socklen_t addrlen);
+extern ssize_t __sendmsg(int sockfd, const struct msghdr *msg, int flags);
 extern int __libc_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 extern int __poll(struct pollfd *fds, nfds_t nfds, int timeout);
 #endif
@@ -283,16 +344,28 @@ void coroutine_hook_init()
     connect_f = (connect_t)dlsym(RTLD_NEXT, "connect");
     read_f = (read_t)dlsym(RTLD_NEXT, "read");
     readv_f = (readv_t)dlsym(RTLD_NEXT, "readv");
+    recv_f = (recv_t)dlsym(RTLD_NEXT, "recv");
+    recvfrom_f = (recvfrom_t)dlsym(RTLD_NEXT, "recvfrom");
+    recvmsg_f = (recvmsg_t)dlsym(RTLD_NEXT, "recvmsg");
     write_f = (write_t)dlsym(RTLD_NEXT, "write");
     writev_f = (writev_t)dlsym(RTLD_NEXT, "writev");
+    send_f = (send_t)dlsym(RTLD_NEXT, "send");
+    sendto_f = (sendto_t)dlsym(RTLD_NEXT, "sendto");
+    sendmsg_f = (sendmsg_t)dlsym(RTLD_NEXT, "sendmsg");
     accept_f = (accept_t)dlsym(RTLD_NEXT, "accept");
     poll_f = (poll_t)dlsym(RTLD_NEXT, "poll");
 #else
     connect_f = &__connect;
     read_f = &__read;
     readv_f = &__readv;
+    recv_f = &__recv;
+    recvfrom_f = &__recvfrom;
+    recvmsg_f = &__recvmsg;
     write_f = &__write;
     writev_f = &__writev;
+    send_f = &__send;
+    sendto_f = &__sendto;
+    sendmsg_f = &__sendmsg;
     accept_f = &__libc_accept;
     poll_f = &__poll;
 #endif
