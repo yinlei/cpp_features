@@ -5,116 +5,34 @@
 
 ### coroutine  - 像golang一样好用的协程库
 
-##### 基础用法
-~~~~~~~~~~cpp
-#include "coroutine.h"
-#include <iostream>
-#include <unistd.h>
-using namespace std;
+coroutine是一个使用C++11编写的调度式stackful协程库,
+同时也是一个强大的并行编程库，只能运行在Linux-OS上, 依赖GNU-C.
+是专为linux服务端程序开发设计的底层框架。
 
-void f2()
-{
-    cout << 2 << endl;
-    yield;
-    cout << 4 << endl;
-    yield;
-    cout << 6 << endl;
-}
+使用coroutine编写并行程序，即可以像go、erlang这些并发语言一样
+开发迅速且逻辑简洁，又有C++原生的性能优势，鱼和熊掌从此可以兼得。
 
-void f1()
-{
-    go f2;
-    cout << 1 << endl;
-    yield;
-    cout << 3 << endl;
-    yield;
-    cout << 5 << endl;
-}
-
-int main()
-{
-    go f1;
-    cout << "go" << endl;
-    while (!g_Scheduler.IsEmpty()) {
-        g_Scheduler.Run();
-    }
-    cout << "end" << endl;
-    return 0;
-}
-
-// 输出结果
-go
-1
-2
-3
-4
-5
-6
-end
-~~~~~~~~~~
-
-##### 高级应用：将同步的第三方库变为异步模型，提升性能。（以hiredis为例)
-~~~~~~~~~~cpp
-#include <hiredis/hiredis.h>
-#include "coroutine.h"
-#include <stdio.h>
-#include <memory>
-
-void do_redis(int num)
-{
-    redisContext* redis_ctx = redisConnect("127.0.0.1", 6379);
-    if (!redis_ctx) {
-        printf("[%d] connect error.\n", num);
-        return ;
-    }
-
-    if (redis_ctx->err) {
-        printf("[%d] connect error %d\n", num, redis_ctx->err);
-        return ;
-    }
-
-    printf("[%d] connected redis.\n", num);
-    std::shared_ptr<redisContext> _ep(redis_ctx, [](redisContext* c){ redisFree(c); });
-
-    const char* cmd_set = "set i 1";
-    redisReply *reply = (redisReply*)redisCommand(redis_ctx, cmd_set);
-    if (!reply) {
-        printf("[%d] reply is NULL.\n", num);
-        return ;
-    }
-
-    std::shared_ptr<redisReply> _ep_reply(reply, [](redisReply* reply){ freeReplyObject(reply); });
-
-    if (!(reply->type == REDIS_REPLY_STATUS && strcasecmp(reply->str,"OK")==0)) {
-        printf("[%d] execute command error.\n", num);
-        return;  
-    }     
-
-    printf("[%d] execute command success.\n", num);
-}
-
-int main()
-{
-//    g_Scheduler.GetOptions().debug = true;
-    for (int i = 0; i < 2; ++i)
-    {
-        go [=]{ do_redis(i); };
-    }
-    printf("go\n");
-    while (!g_Scheduler.IsEmpty())
-        g_Scheduler.Run();
-    printf("end\n");
-    return 0;
-}
-
-// 输出结果
-go
-[0] connected redis.
-[1] connected redis.
-[0] execute command success.
-[1] execute command success.
-end
-~~~~~~~~~~
+coroutine有以下特点：
+ *   1.提供不输与golang的强大的协程
+      基于corontine编写代码，可以以同步的方式
+      编写简单的代码，同时获得异步的性能，
+ *   2.允许用户自主控制协程调度点
+ *   3.支持多线程调度协程，极易编写并行代码，高效的并行调度算法，可以有效利用多个CPU核心
+ *   4.采用hook-socket函数族的方式，可以让链接
+      进程序的同步的第三方库变为异步调用，大大
+      提升其性能。
+      再也不用担心某些DB官方不提供异步driver了，
+      比如hiredis、mysqlclient这种客户端驱动
+      可以直接使用，并且可以得到不输于异步
+      driver的性能。
+ *   5.动态链接和静态链接全都支持
+      便于使用C++11的用户使用静态链接生成可执行
+      文件并部署至低版本的linux系统上。
+ *   6.提供协程锁(co_mutex), 定时器, channel等特性,
+      帮助用户更加容易地编写程序. 
+ 
+ * 如果你发现了任何bug、有好的建议、或使用上有不明之处，请联系作者:
+      email:  289633152@qq.com
 
 ### multiret   - 让C++支持多返回值
 
