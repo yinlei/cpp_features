@@ -104,7 +104,7 @@ TEST_P(ExceptionFuncTest, ExceptionSafe2)
 TEST_P(ExceptionFuncTest, ExceptionSafe3)
 {
     g_Scheduler.GetOptions().exception_handle = eCoExHandle::delay_rethrow;
-    g_Scheduler.GetOptions().stack_size = 4 * 1024;
+    g_Scheduler.GetOptions().stack_size = 16 * 1024;
     for (int i = 0; i < 1000; ++i) {
         go fn_;
         go inc_foo;
