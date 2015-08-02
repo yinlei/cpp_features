@@ -34,6 +34,12 @@ coroutine有以下特点：
 
  *   coroutine/samples目录下有很多示例代码，内含详细的使用说明，让用户可以循序渐进的学习coroutine库的使用方法。
 
+##### coroutine库的链接方法：
+     * 动态链接时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
+       g++ -std=c++11 test.cpp -lcoroutine -ldl [-lother_libs]
+     * 静态链接时，只需链接libcoroutine.a即可，不要求链接顺序. 例如:
+       g++ -std=c++11 test.cpp -lcoroutine -static -static-libgcc -static-libstdc++
+
 ### multiret   - 让C++支持多返回值
 
 ~~~~~~~~~~cpp
