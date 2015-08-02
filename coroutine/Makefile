@@ -30,3 +30,5 @@ clean:
 install:
 	install -m 0664 $(STATIC_LIB) /usr/lib
 	install -m 0775 $(DYNAMIC_LIB) /usr/lib
+	mkdir -p /usr/include/coroutine
+	install -m 0664 *.h /usr/include/coroutine
