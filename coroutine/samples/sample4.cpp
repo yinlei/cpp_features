@@ -1,61 +1,47 @@
-/************************************************
- * coroutine sample5
-*************************************************/
-
 /***********************************************
- * 结合boost.asio, 使网络编程变得更加简单.
- * 如果你不喜欢boost.asio, 这个例子可以跳过不看.
+ * coroutine支持异常安全, 对于协程中的抛出未捕获
+ * 的异常提供以下几种处理方式:
+ *   1.立即在协程栈上抛出异常, 此举会导致进程直接崩溃, 但是可以生成带有堆栈的coredump
+ *     设置方法：
+ *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::immedaitely_throw;
+ *   2.结束当前协程, 使其堆栈回滚, 将异常暂存至调度器Run时抛出.
+ *     设置方法：
+ *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::delay_rethrow;
+ *   3.结束当前协程, 吃掉异常, 仅打印一些日志信息.
+ *     设置方法：
+ *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::debugger_only;
+ *
+ * 显示日志信息需要打开exception相关的调试信息:
+ *       g_Scheduler.GetOptions().debug |= dbg_exception;
+ *
+ * 日志信息默认显示在标准输出上，允许用户重定向
 ************************************************/
-#include <boost/thread.hpp>
-#include <boost/asio.hpp>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 #include "coroutine.h"
-
-static const uint16_t port = 43333;
-using namespace boost::asio;
-using namespace boost::asio::ip;
-using boost::system::error_code;
-
-// 由于socket的析构要依赖于io_service, 所以注意控制
-// io_service的生命期要长于socket
-io_service ios;
-
-tcp::endpoint addr(address::from_string("127.0.0.1"), port);
-
-void echo_server()
-{
-    tcp::acceptor acc(ios, addr, true);
-    for (int i = 0; i < 2; ++i) {
-        std::shared_ptr<tcp::socket> s(new tcp::socket(ios));
-        acc.accept(*s);
-        go [s]{
-            char buf[1024];
-            auto n = s->read_some(buffer(buf));
-            n = s->write_some(buffer(buf, n));
-            error_code ignore_ec;
-            n = s->read_some(buffer(buf, 1), ignore_ec);
-        };
-    }
-}
-
-void client()
-{
-    tcp::socket s(ios);
-    s.connect(addr);
-    std::string msg = "1234";
-    int n = s.write_some(buffer(msg));
-    printf("client send msg [%d] %s\n", msg.size(), msg.c_str());
-    char buf[12];
-    n = s.receive(buffer(buf, n));
-    printf("client recv msg [%d] %.*s\n", n, n, buf);
-}
 
 int main()
 {
-    go echo_server;
-    go client;
-    go client;
+    g_Scheduler.GetOptions().exception_handle = eCoExHandle::delay_rethrow;
+    go []{ throw 1; };
+    try {
+        g_Scheduler.RunUntilNoTask();
+    } catch (int v) {
+        printf("caught delay throw exception:%d\n", v);
+    }
 
-    // 单线程执行
+    g_Scheduler.GetOptions().debug |= dbg_exception;
+    g_Scheduler.GetOptions().exception_handle = eCoExHandle::debugger_only;
+    go []{
+        // 为了使打印的日志信息更加容易辨识，还可以给当前协程附加一些调试信息。
+        g_Scheduler.SetCurrentTaskDebugInfo("throw_ex");
+
+        // 重定向日志信息输出至文件
+        g_Scheduler.GetOptions().debug_output = fopen("log", "a+");
+
+        throw std::exception();
+    };
     g_Scheduler.RunUntilNoTask();
     return 0;
 }

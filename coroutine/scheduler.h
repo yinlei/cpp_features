@@ -14,7 +14,7 @@
 #define DebugPrint(type, fmt, ...) \
     do { \
         if (g_Scheduler.GetOptions().debug & type) { \
-            printf("co_dbg ---- " fmt "\n", ##__VA_ARGS__); \
+            fprintf(g_Scheduler.GetOptions().debug_output, "co_dbg ---- " fmt "\n", ##__VA_ARGS__); \
         } \
     } while(0)
 
@@ -34,21 +34,34 @@ static const uint64_t dbg_timer = 0x1 << 9;
 static const uint64_t dbg_sleep = 0x1 << 10;
 ///-------------------
 
+// 协程中抛出未捕获异常时的处理方式
 enum class eCoExHandle : uint8_t
 {
-    immedaitely_throw,
-    delay_rethrow,
-    debugger_only,
+    immedaitely_throw,  // 立即抛出
+    delay_rethrow,      // 延迟到调度器调度时抛出
+    debugger_only,      // 仅打印调试信息
 };
 
 ///---- 配置选项
 struct CoroutineOptions
 {
-    uint64_t debug = 0;             // 调试选项, 例如: dbg_switch 或 dbg_hook|dbg_task|dbg_wait
+    // 调试选项, 例如: dbg_switch 或 dbg_hook|dbg_task|dbg_wait
+    uint64_t debug = 0;            
+
+    // 调试信息输出位置，改写这个配置项可以重定向输出位置
+    FILE* debug_output = stdout;   
+
+    // 协程中抛出未捕获异常时的处理方式
     eCoExHandle exception_handle = eCoExHandle::immedaitely_throw;
-    uint32_t stack_size = 128 * 1024; // 协程栈大小, 只会影响在此值设置之后新创建的协程.
-    uint32_t chunk_count = 128;     // Run每次最多从run队列中pop出1/chunk_count * task_count个task.
-    uint32_t max_chunk_size = 128;  // Run每次最多从run队列中pop出max_chunk_size个task.
+
+    // 协程栈大小, 只会影响在此值设置之后新创建的协程.
+    uint32_t stack_size = 128 * 1024; 
+
+    // Run每次最多从run队列中pop出1/chunk_count * task_count个task.
+    uint32_t chunk_count = 128;     
+
+    // Run每次最多从run队列中pop出max_chunk_size个task.
+    uint32_t max_chunk_size = 128;  
 };
 ///-------------------
 

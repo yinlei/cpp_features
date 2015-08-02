@@ -13,6 +13,22 @@ static void C_func(Task* self)
 {
     try {
         (self->fn_)();
+    } catch (std::exception& e) {
+        switch (g_Scheduler.GetOptions().exception_handle) {
+            case eCoExHandle::immedaitely_throw:
+                throw ;
+                break;
+
+            case eCoExHandle::delay_rethrow:
+                self->eptr_ = std::current_exception();
+                break;
+
+            default:
+            case eCoExHandle::debugger_only:
+                DebugPrint(dbg_exception, "task(%s) has uncaught exception:%s",
+                        self->DebugInfo(), e.what());
+                break;
+        }
     } catch (...) {
         switch (g_Scheduler.GetOptions().exception_handle) {
             case eCoExHandle::immedaitely_throw:
