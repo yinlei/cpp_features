@@ -1,5 +1,7 @@
 TODO:
-添加channel
+添加类似channel的特性
+支持sleep usleep nanosleep
+
 
 DONE:
 支持exception
