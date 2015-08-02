@@ -3,7 +3,7 @@
 为C++11扩展一些很cool的特性
 
 
-### coroutine  - 像golang一样好用的协程库
+### coroutine  -协程库、并行编程库
 
 coroutine是一个使用C++11编写的调度式stackful协程库,
 同时也是一个强大的并行编程库，只能运行在Linux-OS上, 依赖GNU-C.
