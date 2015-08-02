@@ -6,8 +6,16 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
 static const uint16_t port = 43333;
+
+bool is_exit = false;
+void signal_hd(int signo)
+{
+    if (signo == SIGUSR1)
+        is_exit = true;
+}
 
 void echo_server()
 {
@@ -93,6 +101,8 @@ retry_read:
 
 int main(int argc, char** argv)
 {
+    signal(SIGUSR1, signal_hd);
+
     int thread_count = 1;
     if (argc > 1) {
         thread_count = atoi(argv[1]);
@@ -107,7 +117,7 @@ int main(int argc, char** argv)
     // 单线程执行
     boost::thread_group tg;
     for (int i = 0; i < thread_count; ++i)
-        tg.create_thread([] { g_Scheduler.RunUntilNoTask();} );
+        tg.create_thread([&] { while (!is_exit) g_Scheduler.Run();} );
     tg.join_all();
     return 0;
 }
