@@ -7,9 +7,13 @@ TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp)) $(patsubst %.cpp, s_%.t, $(wild
 
 all : $(TARGET)
 
-s_%.t: %.o
+#s_%.t: %.o
+#	@echo "LD $@"
+#	@$(CC) $(CFLAGS) $^ -o $@ $(INCLUDE) $(LINK) $(STATIC)
+
+sample9.t: sample9.o
 	@echo "LD $@"
-	@$(CC) $(CFLAGS) $^ -o $@ $(INCLUDE) $(LINK) $(STATIC)
+	@$(CC) $(CFLAGS) $^ -o $@ $(INCLUDE) $(LINK) -lcurl
 
 %.t: %.o
 	@echo "LD $@"
