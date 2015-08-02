@@ -1,6 +1,5 @@
 #pragma once
 #include <mutex>
-#include <boost/operators.hpp>
 #include <assert.h>
 #include "spinlock.h"
 
@@ -22,10 +21,7 @@ class SList
 {
 public:
     struct iterator;
-    struct iterator : public
-        boost::equality_comparable<iterator,
-        boost::unit_steppable<iterator,
-        boost::dereferenceable<iterator, T*> > >
+    struct iterator
     {
         TSQueueHook* ptr;
 
@@ -33,9 +29,14 @@ public:
         explicit iterator(TSQueueHook* p) : ptr(p) {}
         friend bool operator==(iterator const& lhs, iterator const& rhs)
         { return lhs.ptr == rhs.ptr; }
+        friend bool operator!=(iterator const& lhs, iterator const& rhs)
+        { return !(lhs.ptr == rhs.ptr); }
         iterator& operator++() { ptr = ptr->next; return *this; }
+        iterator operator++(int) { iterator ret = *this; ++(*this); return ret; }
         iterator& operator--() { ptr = ptr->prev; return *this; }
+        iterator operator--(int) { iterator ret = *this; --(*this); return ret; }
         T& operator*() { return *(T*)ptr; }
+        T* operator->() { return (T*)ptr; }
     };
 
     TSQueueHook* head_;
@@ -56,6 +57,8 @@ public:
         else head_ = head_->next;
         if (hook->next) hook->next->prev = hook->prev;
         else tail_ = tail_->prev;
+        hook->prev = hook->next = NULL;
+        hook->check_ = NULL;
         return it;
     }
     std::size_t size() const

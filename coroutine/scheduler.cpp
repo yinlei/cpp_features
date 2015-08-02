@@ -3,6 +3,7 @@
 #include "error.h"
 #include <stdio.h>
 #include <system_error>
+#include <unistd.h>
 
 Scheduler& Scheduler::getInstance()
 {

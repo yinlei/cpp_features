@@ -1,6 +1,5 @@
 #pragma once
 #include <ucontext.h>
-#include <boost/noncopyable.hpp>
 #include <unordered_map>
 #include <list>
 #include <sys/epoll.h>
@@ -74,7 +73,7 @@ struct ThreadLocalInfo
     ucontext_t scheduler;
 };
 
-class Scheduler : boost::noncopyable
+class Scheduler
 {
     public:
         typedef TSQueue<Task> TaskList;  // 线程安全的协程队列
@@ -168,6 +167,11 @@ class Scheduler : boost::noncopyable
     private:
         Scheduler();
         ~Scheduler();
+
+        Scheduler(Scheduler const&) = delete;
+        Scheduler(Scheduler &&) = delete;
+        Scheduler& operator=(Scheduler const&) = delete;
+        Scheduler& operator=(Scheduler &&) = delete;
 
         // 将一个协程加入可执行队列中
         void AddTaskRunnable(Task* tk);
