@@ -32,6 +32,8 @@ coroutine有以下特点：
  *   如果你发现了任何bug、有好的建议、或使用上有不明之处，可以提交到issue，也可以直接联系作者:
       email:289633152@qq.com
 
+ *   coroutine/samples目录下有很多示例代码，内含详细的使用说明，让用户可以循序渐进的学习coroutine库的使用方法。
+
 ### multiret   - 让C++支持多返回值
 
 ~~~~~~~~~~cpp
