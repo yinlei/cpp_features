@@ -12,6 +12,7 @@ Scheduler& Scheduler::getInstance()
 
 extern void coroutine_hook_init();
 Scheduler::Scheduler()
+    : sleep_ms_{1}
 {
     epoll_fd_ = epoll_create(1024);
     if (epoll_fd_ == -1) {
@@ -90,8 +91,11 @@ uint32_t Scheduler::Run()
     uint32_t tm_count = DoTimer();
 
     if (!run_count && ep_count <= 0 && !tm_count) {
-        DebugPrint(dbg_sleep, "usleep(10)");
-        usleep(10);
+        DebugPrint(dbg_sleep, "sleep %d ms", (int)sleep_ms_);
+        sleep_ms_ = std::min(++sleep_ms_, GetOptions().max_sleep_ms);
+        usleep(sleep_ms_ * 1000);
+    } else {
+        sleep_ms_ = 1;
     }
 
     return run_count;

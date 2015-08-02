@@ -62,6 +62,9 @@ struct CoroutineOptions
 
     // Run每次最多从run队列中pop出max_chunk_size个task.
     uint32_t max_chunk_size = 128;  
+
+    // 没有协程需要调度时, Run最多休眠的毫秒数
+    uint8_t max_sleep_ms = 20;
 };
 ///-------------------
 
@@ -224,6 +227,7 @@ class Scheduler : boost::noncopyable
         // total task.
         std::atomic<uint32_t> task_count_;
         std::atomic<uint32_t> runnable_task_count_;
+        std::atomic<uint8_t> sleep_ms_;
 
     friend class CoMutex;
     friend class BlockObject;

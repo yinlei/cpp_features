@@ -1,5 +1,4 @@
 TODO:
-降低空转时的cpu资源占用(没有任务则usleep(1) ???)
 添加channel
 
 DONE:
@@ -10,3 +9,4 @@ DONE:
 HOOK select poll
 支持accept
 支持asio
+降低空转时的cpu资源占用
