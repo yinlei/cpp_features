@@ -1,4 +1,5 @@
 TODO:
+解决http性能测试出现error, 无法加入epoll的问题
 添加类似channel的特性
 支持sleep usleep nanosleep
 
