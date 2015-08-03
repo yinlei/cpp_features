@@ -13,7 +13,8 @@
 #define DebugPrint(type, fmt, ...) \
     do { \
         if (g_Scheduler.GetOptions().debug & type) { \
-            fprintf(g_Scheduler.GetOptions().debug_output, "co_dbg ---- " fmt "\n", ##__VA_ARGS__); \
+            fprintf(g_Scheduler.GetOptions().debug_output, "co_dbg[0x%04d] ---- " fmt "\n", \
+                    g_Scheduler.GetCurrentThreadID(), ##__VA_ARGS__); \
         } \
     } while(0)
 
@@ -69,8 +70,9 @@ struct CoroutineOptions
 
 struct ThreadLocalInfo
 {
-    Task* current_task;
+    Task* current_task = NULL;
     ucontext_t scheduler;
+    uint32_t thread_id = 0;     // Run thread index, increment from 1.
 };
 
 class Scheduler
@@ -125,6 +127,9 @@ class Scheduler
         // 获取当前协程的调试信息, 返回的内容包括用户自定义的信息和协程ID
         const char* GetCurrentTaskDebugInfo();
 
+        // 获取当前线程ID.(按执行调度器调度的顺序计)
+        uint32_t GetCurrentThreadID();
+
     public:
         /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
         void IOBlockSwitch(int fd, uint32_t event);
@@ -152,12 +157,13 @@ class Scheduler
         
         /// ------------------------------------------------------------------------
         // @{ 定时器
-        uint64_t ExpireAt(CoTimerMgr::TimePoint const& time_point, CoTimer::fn_t const& fn);
+        TimerId ExpireAt(CoTimerMgr::TimePoint const& time_point, CoTimer::fn_t const& fn);
 
         template <typename Duration>
-        uint64_t ExpireAt(Duration const& duration, CoTimer::fn_t const& fn);
+        TimerId ExpireAt(Duration const& duration, CoTimer::fn_t const& fn);
 
-        bool CancelTimer(uint64_t timer_id);
+        bool CancelTimer(TimerId timer_id);
+        bool BlockCancelTimer(TimerId timer_id);
         // }@
         /// ------------------------------------------------------------------------
     
@@ -232,6 +238,7 @@ class Scheduler
         std::atomic<uint32_t> task_count_;
         std::atomic<uint32_t> runnable_task_count_;
         std::atomic<uint8_t> sleep_ms_;
+        std::atomic<uint32_t> thread_id_;
 
     friend class CoMutex;
     friend class BlockObject;

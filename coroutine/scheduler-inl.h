@@ -18,7 +18,7 @@ void Scheduler::IOBlockSwitch(Fdsts & fdsts)
 }
 
 template <typename Duration>
-uint64_t Scheduler::ExpireAt(Duration const& duration, CoTimer::fn_t const& fn)
+TimerId Scheduler::ExpireAt(Duration const& duration, CoTimer::fn_t const& fn)
 {
-    return ExpireAt(CoTimerMgr::Now() + duration, fn);
+    return this->ExpireAt(CoTimerMgr::Now() + duration, fn);
 }

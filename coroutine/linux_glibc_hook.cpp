@@ -9,9 +9,11 @@
 template <typename OriginF, typename ... Args>
 ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
 {
-    DebugPrint(dbg_hook, "hook %s. %s coroutine.", hook_fn_name, g_Scheduler.IsCoroutine() ? "In" : "Not in");
+    Task* tk = g_Scheduler.GetCurrentTask();
+    DebugPrint(dbg_hook, "task(%s) hook %s. %s coroutine.",
+            tk ? tk->DebugInfo() : "nil", hook_fn_name, g_Scheduler.IsCoroutine() ? "In" : "Not in");
 
-    if (!g_Scheduler.IsCoroutine()) {
+    if (!tk) {
         return fn(fd, std::forward<Args>(args)...);
     } else {
         int flags = fcntl(fd, F_GETFL, 0);
@@ -24,8 +26,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
         ssize_t n = fn(fd, std::forward<Args>(args)...);
         if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             // get timeout option.
-            Task* tk = g_Scheduler.GetCurrentTask();
-            uint64_t timer_id = 0;
+            TimerId timer_id;
             struct timeval timeout;
             socklen_t timeout_blen = sizeof(timeout);
             if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
@@ -47,7 +48,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
             bool is_timeout = false;
             if (timer_id) {
                 is_timeout = true;
-                if (g_Scheduler.CancelTimer(timer_id)) {
+                if (g_Scheduler.BlockCancelTimer(timer_id)) {
                     is_timeout = false;
                     tk->DecrementRef(); // timer use ref.
                 }
@@ -123,9 +124,11 @@ static accept_t accept_f = NULL;
 
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
-    DebugPrint(dbg_hook, "hook connect. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
+    Task* tk = g_Scheduler.GetCurrentTask();
+    DebugPrint(dbg_hook, "task(%s) hook connect. %s coroutine.",
+            tk ? tk->DebugInfo() : "nil", g_Scheduler.IsCoroutine() ? "In" : "Not in");
 
-    if (!g_Scheduler.IsCoroutine()) {
+    if (!tk) {
         return connect_f(fd, addr, addrlen);
     } else {
         int flags = fcntl(fd, F_GETFL, 0);
@@ -151,7 +154,6 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             g_Scheduler.IOBlockSwitch(fd, EPOLLOUT);
         }
 
-        Task* tk = g_Scheduler.GetCurrentTask();
         if (tk->wait_successful_ == 0) {
             // 添加到epoll中失败了
             fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
@@ -263,7 +265,11 @@ static short EpollEvent2Poll(uint32_t events)
 
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
-    DebugPrint(dbg_hook, "hook poll. %s coroutine.", g_Scheduler.IsCoroutine() ? "In" : "Not in");
+    Task* tk = g_Scheduler.GetCurrentTask();
+    DebugPrint(dbg_hook, "task(%s) hook poll(nfds=%d, timeout=%d). %s coroutine.",
+            tk ? tk->DebugInfo() : "nil",
+            (int)nfds, timeout,
+            g_Scheduler.IsCoroutine() ? "In" : "Not in");
 
     if (!g_Scheduler.IsCoroutine())
         return poll_f(fds, nfds, timeout);
@@ -271,8 +277,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     if (timeout == 0)
         return poll_f(fds, nfds, timeout);
 
-    Task* tk = g_Scheduler.GetCurrentTask();
-    uint32_t timer_id = 0;
+    TimerId timer_id;
     if (timeout != -1) {
         std::chrono::milliseconds duration{timeout};
         tk->IncrementRef(); // timer use ref.
@@ -287,6 +292,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
         fdsts.emplace_back();
         fdsts.back().fd = fds[i].fd;
         fdsts.back().event = PollEvent2Epoll(fds[i].events);
+        DebugPrint(dbg_hook, "hook poll task(%s), fd[%d]=%d.",
+                tk->DebugInfo(), (int)i, fds[i].fd);
     }
 
     // add into epoll, and switch other context.
@@ -294,7 +301,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     bool is_timeout = false; // 是否超时
     if (timer_id) {
         is_timeout = true;
-        if (g_Scheduler.CancelTimer(timer_id)) {
+        if (g_Scheduler.BlockCancelTimer(timer_id)) {
             tk->DecrementRef(); // timer use ref.
             is_timeout = false;
         }

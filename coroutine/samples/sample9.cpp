@@ -21,7 +21,7 @@ void request_once(const char* url)
     CURL *curl = curl_easy_init();
     if (curl) {
         curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
+//        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_fwrite);
         CURLcode res = curl_easy_perform(curl);
 //        printf("res:%d\n", res);
@@ -50,6 +50,9 @@ int main(int argc, char** argv)
         printf("Usage %s url concurrency\n", argv[0]);
         exit(1);
     }
+
+//    g_Scheduler.GetOptions().debug = dbg_ioblock | dbg_hook;
+//    g_Scheduler.GetOptions().debug_output = fopen("log", "w+");
 
     int concurrency = atoi(argv[2]);
 

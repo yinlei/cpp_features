@@ -21,12 +21,23 @@ struct __go
 
 // co_timer_add will returns timer_id; The timer_id type is uint64_t.
 template <typename Arg, typename F>
-inline uint64_t co_timer_add(Arg const& duration_or_timepoint, F const& callback) {
+inline TimerId co_timer_add(Arg const& duration_or_timepoint, F const& callback) {
     return Scheduler::getInstance().ExpireAt(duration_or_timepoint, callback);
 }
 
-// co_timer_cancel will returns boolean type; if cancel successfully it returns true, else it returns false;
-inline bool co_timer_cancel(uint64_t timer_id) {
+// co_timer_cancel will returns boolean type;
+//   if cancel successfully it returns true,
+//   else it returns false;
+inline bool co_timer_cancel(TimerId timer_id) {
     return Scheduler::getInstance().CancelTimer(timer_id);
+}
+
+// co_timer_block_cancel will returns boolean type;
+//   if cancel successfully it returns true,
+//   else it returns false;
+//
+// This function will block wait timer occurred done, if cancel error.
+inline bool co_timer_block_cancel(TimerId timer_id) {
+    return Scheduler::getInstance().BlockCancelTimer(timer_id);
 }
 

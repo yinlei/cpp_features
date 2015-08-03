@@ -114,6 +114,9 @@ uint32_t Scheduler::DoRunnable()
 {
     ThreadLocalInfo& info = GetLocalInfo();
     info.current_task = NULL;
+    if (!info.thread_id)
+        info.thread_id = ++thread_id_;
+
     uint32_t do_max_count = runnable_task_count_;
     uint32_t do_count = 0;
 
@@ -331,6 +334,11 @@ const char* Scheduler::GetCurrentTaskDebugInfo()
     return tk ? tk->DebugInfo() : "";
 }
 
+uint32_t Scheduler::GetCurrentThreadID()
+{
+    return GetLocalInfo().thread_id;
+}
+
 Task* Scheduler::GetCurrentTask()
 {
     return GetLocalInfo().current_task;
@@ -364,12 +372,16 @@ bool Scheduler::__IOBlockSwitch(Task* tk)
         if (-1 == epoll_ctl(epoll_fd_, EPOLL_CTL_ADD, fdst.fd, &ev)) {
             tk->DecrementRef(); // 添加失败时, 回退刚刚增加的引用计数.
             if (errno == EEXIST) {
-                fprintf(stderr, "add into epoll error:%d,%s\n", errno, strerror(errno));
+                fprintf(stderr, "task(%s) add fd(%d) into epoll error %d:%s\n",
+                        tk->DebugInfo(), fdst.fd, errno, strerror(errno));
+                DebugPrint(dbg_ioblock, "task(%s) add fd(%d) into epoll error %d:%s\n",
+                        tk->DebugInfo(), fdst.fd, errno, strerror(errno));
                 // 某个fd添加失败, 回滚
                 for (auto &fdst : tk->wait_fds_)
                 {
                     if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL)) {
-                        DebugPrint(dbg_ioblock, "task(%s) rollback io_block. fd=%d", tk->DebugInfo(), fdst.fd);
+                        DebugPrint(dbg_ioblock, "task(%s) rollback io_block. fd=%d",
+                                tk->DebugInfo(), fdst.fd);
                         // 减引用计数的条件：谁成功从epoll中删除了一个fd，谁才能减引用计数。
                         tk->DecrementRef();
                     }
@@ -428,18 +440,26 @@ uint32_t Scheduler::UserBlockWakeup(uint32_t type, uint64_t wait_id, uint32_t wa
     return BlockWakeup((int64_t)type, wait_id, wakeup_count);
 }
 
-uint64_t Scheduler::ExpireAt(CoTimerMgr::TimePoint const& time_point,
+TimerId Scheduler::ExpireAt(CoTimerMgr::TimePoint const& time_point,
         CoTimer::fn_t const& fn)
 {
-    uint64_t id = timer_mgr_.ExpireAt(time_point, fn);
-    DebugPrint(dbg_timer, "add timer %llu", (long long unsigned)id);
+    TimerId id = timer_mgr_.ExpireAt(time_point, fn);
+    DebugPrint(dbg_timer, "add timer %llu", (long long unsigned)id->GetId());
     return id;
 }
 
-bool Scheduler::CancelTimer(uint64_t timer_id)
+bool Scheduler::CancelTimer(TimerId timer_id)
 {
     bool ok = timer_mgr_.Cancel(timer_id);
-    DebugPrint(dbg_timer, "cancel timer %llu %s", (long long unsigned)timer_id,
+    DebugPrint(dbg_timer, "cancel timer %llu %s", (long long unsigned)timer_id->GetId(),
+            ok ? "success" : "failed");
+    return ok;
+}
+
+bool Scheduler::BlockCancelTimer(TimerId timer_id)
+{
+    bool ok = timer_mgr_.BlockCancel(timer_id);
+    DebugPrint(dbg_timer, "block_cancel timer %llu %s", (long long unsigned)timer_id->GetId(),
             ok ? "success" : "failed");
     return ok;
 }
