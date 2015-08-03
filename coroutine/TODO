@@ -1,7 +1,7 @@
 TODO:
-解决http性能测试出现error, 无法加入epoll的问题
-添加类似channel的特性
 支持sleep usleep nanosleep
+支持poll(NULL, 0, 1000);这种用来做sleep的用法
+添加类似channel的特性
 
 
 DONE:
@@ -13,3 +13,4 @@ HOOK select poll
 支持accept
 支持asio
 降低空转时的cpu资源占用
+解决http性能测试出现error, 无法加入epoll的问题
