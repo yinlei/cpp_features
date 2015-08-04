@@ -1,6 +1,3 @@
-#pragma once
-#include "scheduler.h"
-
 /************************************************
  * 处理IO协程切换、epoll等待、等待成功、超时取消等待，
  *     及其多线程并行关系。
@@ -13,7 +10,7 @@
     |    *          v
     |    * -------------------
 Coroutine* save state/fds/timeout
-    |    * -------------------
+runnable * -------------------
     |    *          |
     |    *          v
     |    * -------------------
@@ -34,7 +31,7 @@ Coroutine* save state/fds/timeout
     |    *          .             |                 if failed, rollback    |
     |    *          .             |                 -------------------    
 Scheduler*          v             |                          |         epoll_wait
-    |    * -------------------    |                          v                 
+io_block * -------------------    |                          v                 
     |    *  add fd into epoll     |                 -------------------    |
     |    * -------------------    |                 delete fds in epoll    |
     |    *          |                               -------------------____v____
@@ -48,44 +45,63 @@ Scheduler*          v             |                          |         epoll_wai
     |    *     begin wait         |      time out   -------------------
  ___v___ * -------------------    |          |      push into runnable list
     ^    *          |             |          |      -------------------
-    |    *          .             |          |
-    |    * epoll_wait             |          |
-Wait Loop*     or   .             |          |
-    |    *  time out.             |          |
-    |    *          .             |          |
- ___v___ *          v             |          |
-    ^    * -------------------    |          |
-    |    * delete fds in epoll    |          |
-    |    * -------------------____v____      |
+    |    *          .             |          |               |
+    |    * epoll_wait             |          |               v
+    |    *     or   .             |          |      -------------------
+Wait Loop*  time out.             |          |       Once Syscall Done
+io_block *          .             |          |      -------------------
+    |    *          v         ____v____      |
+    |    * -------------------               |
+    |    * delete fds in epoll               |
+    |    * -------------------               |
     |    *          |                        |
     |    *          v                        |
     |    * -------------------               |
-    |    *    continue run                   |
+    |    * push into runnable list           |
     |    * -------------------               |
-Coroutine*          |                        |
-    |    *          v                        |
+ ___v___ *          |                        |
+    ^    *          v                        |
     |    * -------------------               |
-    |    *    cancel timer                   |
+    |    * block cancel timer                |
     |    * -------------------_______________v____
-    |    *          |
-    |    *          v
+Coroutine*          |
+runnable *          v
     |    * -------------------
     |    *  Once Syscall Done
  ___v___ * -------------------
          *
 *************************************************/
+#pragma once
+#include "task.h"
+#include "timer.h"
+#include <vector>
+#include <list>
+#include <unordered_set>
+
 class IoWait
 {
 public:
     IoWait();
 
-    void Switch(std::vector<Fdst> & fdsts);
+    // 在协程中调用的switch, 暂存状态并yield
+    void CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms);
 
-    void Cancel(Task *tk);
+    // 在调度器中调用的switch, 如果成功则进入等待队列，如果失败则重新加回runnable队列
+    bool SchedulerSwitch(Task* tk);
 
-    uint32_t WaitLoop();
+    int WaitLoop();
 
 private:
+    void Cancel(Task *tk);
+
     int epoll_fd_;
+    LFLock epoll_lock_;
+    std::unordered_set<Task*> epollwait_tasks_;
+    std::list<CoTimerPtr> timeout_list_;
+    LFLock timeout_list_lock_;
+    CoTimerMgr timer_mgr_;
+
+    typedef TSQueue<Task> TaskList;
+    TaskList wait_tasks_;
 };
 

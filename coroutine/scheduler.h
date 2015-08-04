@@ -9,6 +9,7 @@
 #include "block_object.h"
 #include "co_mutex.h"
 #include "timer.h"
+#include "io_wait.h"
 
 #define DebugPrint(type, fmt, ...) \
     do { \
@@ -132,12 +133,9 @@ class Scheduler
 
     public:
         /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
-        void IOBlockSwitch(int fd, uint32_t event);
+        void IOBlockSwitch(int fd, uint32_t event, int timeout_ms);
 
-        template <typename Fdsts>
-        void IOBlockSwitch(Fdsts & fdsts);
-
-        void IOBlockCancel(Task* tk);
+        void IOBlockSwitch(std::vector<Fdst> &fdsts, int timeout_ms);
 
         /// ------------------------------------------------------------------------
         // @{ 以计数的方式模拟实现的协程同步方式. 
@@ -219,7 +217,9 @@ class Scheduler
 
         // List of task.
         TaskList run_tasks_;
-        TaskList wait_tasks_;
+
+        // epoll, io block waiter.
+        IoWait io_wait_;
 
         // User define wait tasks table.
         WaitTable user_wait_tasks_;
@@ -227,12 +227,6 @@ class Scheduler
 
         // Timer manager.
         CoTimerMgr timer_mgr_;
-
-        // epoll, io block waiter.
-        int epoll_fd_;
-        LFLock epoll_lock_;
-        LFLock io_cancel_tasks_lock_;
-        std::list<Task*> io_cancel_tasks_;
 
         // total task.
         std::atomic<uint32_t> task_count_;
@@ -242,6 +236,7 @@ class Scheduler
 
     friend class CoMutex;
     friend class BlockObject;
+    friend class IoWait;
 };
 
 #define g_Scheduler Scheduler::getInstance()

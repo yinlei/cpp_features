@@ -90,7 +90,7 @@ void CoTimerMgr::__Cancel(CoTimerPtr co_timer_ptr)
     }
 }
 
-uint32_t CoTimerMgr::GetExpired(std::vector<CoTimerPtr> &result, uint32_t n)
+uint32_t CoTimerMgr::GetExpired(std::list<CoTimerPtr> &result, uint32_t n)
 {
     std::unique_lock<LFLock> lock(lock_);
     TimePoint now = Now();

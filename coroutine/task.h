@@ -51,12 +51,14 @@ struct Task
     TaskF fn_;
     char* stack_;
     std::string debug_info_;
-
     std::exception_ptr eptr_;           // 保存exception的指针
     std::atomic<uint32_t> ref_count_;   // 引用计数
+
     std::vector<FdStruct> wait_fds_;    // io_block等待的fd列表
     uint32_t wait_successful_;          // io_block成功等待到的fd数量(用于poll和select)
     LFLock io_block_lock_;              // 当等待的fd多余1个时, 用此锁sync添加到epoll和从epoll删除的操作, 以防在epoll中残留fd, 导致Task无法释放.
+    TimerId io_block_timer_;
+
     int64_t user_wait_type_;            // user_block等待的类型
     uint64_t user_wait_id_;             // user_block等待的id
     BlockObject* block_;                // sys_block等待的block对象

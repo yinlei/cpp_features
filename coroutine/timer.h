@@ -52,7 +52,7 @@ public:
     bool Cancel(CoTimerPtr co_timer_ptr);
     bool BlockCancel(CoTimerPtr co_timer_ptr);
 
-    uint32_t GetExpired(std::vector<CoTimerPtr> &result, uint32_t n = 1);
+    uint32_t GetExpired(std::list<CoTimerPtr> &result, uint32_t n = 1);
 
     static TimePoint Now();
 
