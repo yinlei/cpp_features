@@ -16,14 +16,15 @@ int main()
     // 第一个参数可以是std::chrono中的时间长度，也可以是时间点。
     // 第二个参数是定时器回调函数
     // 返回一个uint64_t类型的ID, 通过这个ID可以撤销还未执行的定时函数
-    uint64_t id1 = co_timer_add(std::chrono::seconds(1), [&]{
+    TimerId id1 = co_timer_add(std::chrono::seconds(1), [&]{
             printf("Timer Callback.\n");
             });
 
     // co_timer_cancel接口可以撤销还未执行的定时函数
     // 它只接受一个参数，就是co_timer_add返回的ID。
     // 它返回bool类型的结果，如果撤销成功，返回true；
-    //     如果未来得及撤销而是被执行了，返回false；
+    //     如果未来得及撤销，返回false, 此时不保证回调函数已执行完毕。
+    //     如果需要保证回调函数不再撤销失败以后被执行, 需要使用co_timer_block_cancel接口
     bool cancelled = co_timer_cancel(id1);
     printf("cancelled:%s\n", cancelled ? "true" : "false");
 

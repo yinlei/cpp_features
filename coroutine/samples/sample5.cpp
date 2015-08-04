@@ -43,7 +43,7 @@ void client()
     s.connect(addr);
     std::string msg = "1234";
     int n = s.write_some(buffer(msg));
-    printf("client send msg [%d] %s\n", msg.size(), msg.c_str());
+    printf("client send msg [%d] %s\n", (int)msg.size(), msg.c_str());
     char buf[12];
     n = s.receive(buffer(buf, n));
     printf("client recv msg [%d] %.*s\n", n, n, buf);
