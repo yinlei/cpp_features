@@ -76,7 +76,7 @@ runnable *          v
 #include "timer.h"
 #include <vector>
 #include <list>
-#include <unordered_set>
+#include <set>
 
 class IoWait
 {
@@ -87,16 +87,26 @@ public:
     void CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms);
 
     // 在调度器中调用的switch, 如果成功则进入等待队列，如果失败则重新加回runnable队列
-    bool SchedulerSwitch(Task* tk);
+    void SchedulerSwitch(Task* tk);
 
     int WaitLoop();
 
 private:
-    void Cancel(Task *tk);
+    void Cancel(Task *tk, uint32_t id);
+
+    struct EpollWaitSt
+    {
+        Task* tk;
+        uint32_t id;
+
+        friend bool operator<(EpollWaitSt const& lhs, EpollWaitSt const& rhs) {
+            return lhs.tk < rhs.tk;
+        }
+    };
 
     int epoll_fd_;
     LFLock epoll_lock_;
-    std::unordered_set<Task*> epollwait_tasks_;
+    std::set<EpollWaitSt> epollwait_tasks_;
     std::list<CoTimerPtr> timeout_list_;
     LFLock timeout_list_lock_;
     CoTimerMgr timer_mgr_;

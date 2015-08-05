@@ -151,9 +151,7 @@ uint32_t Scheduler::DoRunnable()
                 case TaskState::io_block:
                     --runnable_task_count_;
                     it = slist.erase(it);
-                    if (!io_wait_.SchedulerSwitch(tk)) {
-                        AddTaskRunnable(tk);
-                    }
+                    io_wait_.SchedulerSwitch(tk);
                     break;
 
                 case TaskState::sys_block:

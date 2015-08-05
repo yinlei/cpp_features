@@ -34,12 +34,16 @@ void IoWait::CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms)
     g_Scheduler.Yield();
 }
 
-bool IoWait::SchedulerSwitch(Task* tk)
+void IoWait::SchedulerSwitch(Task* tk)
 {
     bool ok = false;
     std::unique_lock<LFLock> lock(tk->io_block_lock_, std::defer_lock);
     if (tk->wait_fds_.size() > 1)
         lock.lock();
+
+    // id一定要先取出来, 因为在下面的for中, 有可能在另一个线程epoll_wait成功,
+    // 并且重新进入一次syscall, 导致id变化.
+    uint32_t id = tk->io_block_id_;
 
     wait_tasks_.push(tk);
     for (auto &fdst : tk->wait_fds_)
@@ -76,24 +80,28 @@ bool IoWait::SchedulerSwitch(Task* tk)
                 tk->DebugInfo(), fdst.fd, fdst.event);
     }
 
-    if (!ok)
-        wait_tasks_.pop();
+    if (!ok) {
+        if (wait_tasks_.erase(tk)) {
+            g_Scheduler.AddTaskRunnable(tk);
+        }
+    }
     else if (tk->io_block_timeout_ != -1) {
         // set timer.
         tk->IncrementRef();
         tk->io_block_timer_ = timer_mgr_.ExpireAt(std::chrono::milliseconds(tk->io_block_timeout_),
                 [=]{ 
-                    this->Cancel(tk);
+                    this->Cancel(tk, id);
                     tk->DecrementRef();
                 });
     }
-
-    return ok;
 }
 
-void IoWait::Cancel(Task *tk)
+void IoWait::Cancel(Task *tk, uint32_t id)
 {
-    if (wait_tasks_.erase(tk)) { // sync between timer and epoll.
+    if (tk->io_block_id_ != id)
+        return ;
+
+    if (wait_tasks_.erase(tk)) { // sync between timer and epoll_wait.
         DebugPrint(dbg_ioblock, "task(%s) io_block wakeup.", tk->DebugInfo());
 
         std::unique_lock<LFLock> lock(tk->io_block_lock_, std::defer_lock);
@@ -148,11 +156,11 @@ retry:
         ++tk->wait_successful_;
         // 将tk暂存, 最后再执行Cancel, 是为了poll和select可以得到正确的计数。
         // 以防Task被加入runnable列表后，被其他线程执行
-        epollwait_tasks_.insert(tk);     
+        epollwait_tasks_.insert(EpollWaitSt{tk, ep->io_block_id});
     }
 
-    for (auto &tk : epollwait_tasks_)
-        Cancel(tk);
+    for (auto &st : epollwait_tasks_)
+        Cancel(st.tk, st.id);
 
     {
         std::list<CoTimerPtr> timeout_list;
