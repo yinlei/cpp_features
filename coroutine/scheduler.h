@@ -135,7 +135,7 @@ class Scheduler
         /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
         void IOBlockSwitch(int fd, uint32_t event, int timeout_ms);
 
-        void IOBlockSwitch(std::vector<Fdst> &fdsts, int timeout_ms);
+        void IOBlockSwitch(std::vector<FdStruct> &fdsts, int timeout_ms);
 
         /// ------------------------------------------------------------------------
         // @{ 以计数的方式模拟实现的协程同步方式. 

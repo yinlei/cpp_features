@@ -6,6 +6,7 @@
 #include <vector>
 #include <list>
 #include "ts_queue.h"
+#include "timer.h"
 
 enum class TaskState
 {
@@ -24,9 +25,10 @@ struct Task;
 
 struct EpollPtr
 {
-    FdStruct* fdst;
-    Task* tk;
-    uint32_t revent;    // 结果event
+    FdStruct* fdst = NULL;
+    Task* tk = NULL;
+    uint32_t io_block_id = 0;
+    uint32_t revent = 0;    // 结果event
 };
 
 struct FdStruct
@@ -35,7 +37,7 @@ struct FdStruct
     uint32_t event;     // epoll event flags.
     EpollPtr epoll_ptr; // 传递入epoll的指针
 
-    FdStruct() : fd(-1), event(0), epoll_ptr{NULL, NULL, 0} {
+    FdStruct() : fd(-1), event(0) {
         epoll_ptr.fdst = this;
     }
 };
@@ -54,9 +56,11 @@ struct Task
     std::exception_ptr eptr_;           // 保存exception的指针
     std::atomic<uint32_t> ref_count_;   // 引用计数
 
+    std::atomic<uint32_t> io_block_id_; // 每次io_block请求分配一个ID
     std::vector<FdStruct> wait_fds_;    // io_block等待的fd列表
     uint32_t wait_successful_;          // io_block成功等待到的fd数量(用于poll和select)
     LFLock io_block_lock_;              // 当等待的fd多余1个时, 用此锁sync添加到epoll和从epoll删除的操作, 以防在epoll中残留fd, 导致Task无法释放.
+    int io_block_timeout_;
     TimerId io_block_timer_;
 
     int64_t user_wait_type_;            // user_block等待的类型

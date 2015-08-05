@@ -4,6 +4,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
+#include <list>
 #include "spinlock.h"
 
 class CoTimer

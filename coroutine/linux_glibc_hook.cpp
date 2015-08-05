@@ -26,29 +26,23 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
         ssize_t n = fn(fd, std::forward<Args>(args)...);
         if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             // get timeout option.
-            TimerId timer_id;
+            int timeout_ms = -1;
             struct timeval timeout;
             socklen_t timeout_blen = sizeof(timeout);
             if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
                 if (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
-                    std::chrono::milliseconds duration{timeout.tv_sec * 1000 +
-                        timeout.tv_usec / 1000};
+                    timeout_ms = timeout.tv_sec * 1000 + timeout.tv_usec / 1000;
                     DebugPrint(dbg_hook, "hook task(%s) %s timeout=%dms. fd=%d",
-                            g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, (int)duration.count(), fd);
-                    tk->IncrementRef(); // timer use ref.
-                    timer_id = g_Scheduler.ExpireAt(duration, [=]{
-                            g_Scheduler.IOBlockCancel(tk);
-                            tk->DecrementRef(); // timer use ref.
-                            });
+                            g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, timeout_ms, fd);
                 }
             }
 
             // add into epoll, and switch other context.
-            g_Scheduler.IOBlockSwitch(fd, event);
+            g_Scheduler.IOBlockSwitch(fd, event, timeout_ms);
             bool is_timeout = false;
-            if (timer_id) {
+            if (tk->io_block_timer_) {
                 is_timeout = true;
-                if (g_Scheduler.BlockCancelTimer(timer_id)) {
+                if (g_Scheduler.CancelTimer(tk->io_block_timer_)) {
                     is_timeout = false;
                     tk->DecrementRef(); // timer use ref.
                 }
@@ -151,7 +145,7 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
             return n;
         } else {
             // add into epoll, and switch other context.
-            g_Scheduler.IOBlockSwitch(fd, EPOLLOUT);
+            g_Scheduler.IOBlockSwitch(fd, EPOLLOUT, -1);
         }
 
         if (tk->wait_successful_ == 0) {
@@ -277,14 +271,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     if (timeout == 0)
         return poll_f(fds, nfds, timeout);
 
-    TimerId timer_id;
-    if (timeout != -1) {
-        std::chrono::milliseconds duration{timeout};
-        tk->IncrementRef(); // timer use ref.
-        timer_id = g_Scheduler.ExpireAt(duration, [=]{
-                g_Scheduler.IOBlockCancel(tk);
-                tk->DecrementRef(); // timer use ref.
-                });
+    if (nfds == 0) {
+        // TODO: nanosleep
     }
 
     std::vector<FdStruct> fdsts;
@@ -297,11 +285,11 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     }
 
     // add into epoll, and switch other context.
-    g_Scheduler.IOBlockSwitch(fdsts);
+    g_Scheduler.IOBlockSwitch(fdsts, timeout);
     bool is_timeout = false; // 是否超时
-    if (timer_id) {
+    if (tk->io_block_timer_) {
         is_timeout = true;
-        if (g_Scheduler.BlockCancelTimer(timer_id)) {
+        if (g_Scheduler.CancelTimer(tk->io_block_timer_)) {
             tk->DecrementRef(); // timer use ref.
             is_timeout = false;
         }

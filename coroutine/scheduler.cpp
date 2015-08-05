@@ -290,13 +290,13 @@ Task* Scheduler::GetCurrentTask()
 
 void Scheduler::IOBlockSwitch(int fd, uint32_t event, int timeout_ms)
 {
-    FdStruct fdst[1];
+    std::vector<FdStruct> fdst(1);
     fdst[0].fd = fd;
     fdst[0].event = event;
     IOBlockSwitch(fdst, timeout_ms);
 }
 
-void IOBlockSwitch(std::vector<FdStruct> &fdsts, int timeout_ms)
+void Scheduler::IOBlockSwitch(std::vector<FdStruct> &fdsts, int timeout_ms)
 {
     io_wait_.CoSwitch(fdsts, timeout_ms);
 }

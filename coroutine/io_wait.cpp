@@ -16,18 +16,22 @@ IoWait::IoWait()
 void IoWait::CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms)
 {
     // TODO: 支持同一个fd被多个协程等待
-    Task* tk = GetLocalInfo().current_task;
+    Task* tk = g_Scheduler.GetCurrentTask();
     if (!tk) return ;
 
+    uint32_t id = ++tk->io_block_id_;
     tk->state_ = TaskState::io_block;
     tk->wait_fds_.clear();
     tk->wait_successful_ = 0;
+    tk->io_block_timeout_ = timeout_ms;
+    tk->io_block_timer_.reset();
     for (auto &fdst : fdsts) {
         fdst.epoll_ptr.tk = tk;
+        fdst.epoll_ptr.io_block_id = id;
         tk->wait_fds_.push_back(fdst);
     }
 
-    Yield();
+    g_Scheduler.Yield();
 }
 
 bool IoWait::SchedulerSwitch(Task* tk)
@@ -37,6 +41,7 @@ bool IoWait::SchedulerSwitch(Task* tk)
     if (tk->wait_fds_.size() > 1)
         lock.lock();
 
+    wait_tasks_.push(tk);
     for (auto &fdst : tk->wait_fds_)
     {
         epoll_event ev = {fdst.event, {(void*)&fdst.epoll_ptr}};
@@ -71,6 +76,18 @@ bool IoWait::SchedulerSwitch(Task* tk)
                 tk->DebugInfo(), fdst.fd, fdst.event);
     }
 
+    if (!ok)
+        wait_tasks_.pop();
+    else if (tk->io_block_timeout_ != -1) {
+        // set timer.
+        tk->IncrementRef();
+        tk->io_block_timer_ = timer_mgr_.ExpireAt(std::chrono::milliseconds(tk->io_block_timeout_),
+                [=]{ 
+                    this->Cancel(tk);
+                    tk->DecrementRef();
+                });
+    }
+
     return ok;
 }
 
@@ -93,7 +110,7 @@ void IoWait::Cancel(Task *tk)
             }
         }
 
-        AddTaskRunnable(tk);
+        g_Scheduler.AddTaskRunnable(tk);
     }
 }
 
@@ -144,7 +161,7 @@ retry:
     }
 
     for (auto &cb : timeout_list_)
-        cb();
+        (*cb)();
 
     // 由于epoll_wait的结果中会残留一些未计数的Task*,
     //     epoll的性质决定了这些Task无法计数, 
