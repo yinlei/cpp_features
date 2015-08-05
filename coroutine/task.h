@@ -61,7 +61,7 @@ struct Task
     uint32_t wait_successful_;          // io_block成功等待到的fd数量(用于poll和select)
     LFLock io_block_lock_;              // 当等待的fd多余1个时, 用此锁sync添加到epoll和从epoll删除的操作, 以防在epoll中残留fd, 导致Task无法释放.
     int io_block_timeout_;
-    TimerId io_block_timer_;
+    CoTimerPtr io_block_timer_;
 
     int64_t user_wait_type_;            // user_block等待的类型
     uint64_t user_wait_id_;             // user_block等待的id
@@ -76,13 +76,8 @@ struct Task
     static uint64_t s_id;
     static std::atomic<uint64_t> s_task_count;
 
-    void IncrementRef() { ++ref_count_; }
-    void DecrementRef() {
-        if (--ref_count_ == 0) {
-            std::unique_lock<LFLock> lock(s_delete_list_lock);
-            s_delete_list.push_back(this);
-        }
-    }
+    void IncrementRef();
+    void DecrementRef();
     static uint64_t GetTaskCount();
 
     // Task引用计数归0时不要立即释放, 以防epoll_wait取到残余数据时访问野指针.
@@ -94,4 +89,17 @@ struct Task
     static std::size_t GetDeletedTaskCount();
 };
 
+class RefGuard
+{
+public:
+    explicit RefGuard(Task* tk);
+    explicit RefGuard(Task& tk);
+    ~RefGuard();
+
+    RefGuard(RefGuard const&) = delete;
+    RefGuard& operator=(RefGuard const&) = delete;
+
+private:
+    Task *tk_;
+};
 

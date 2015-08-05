@@ -1,6 +1,6 @@
 #include "io_wait.h"
-#include "scheduler.h"
 #include <sys/poll.h>
+#include "scheduler.h"
 
 IoWait::IoWait()
 {
@@ -31,6 +31,8 @@ void IoWait::CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms)
         tk->wait_fds_.push_back(fdst);
     }
 
+    DebugPrint(dbg_ioblock, "task(%s) CoSwitch id=%d, nfds=%d, timeout=%d",
+            tk->DebugInfo(), id, (int)fdsts.size(), timeout_ms);
     g_Scheduler.Yield();
 }
 
@@ -45,6 +47,7 @@ void IoWait::SchedulerSwitch(Task* tk)
     // 并且重新进入一次syscall, 导致id变化.
     uint32_t id = tk->io_block_id_;
 
+    RefGuard ref_guard(tk);
     wait_tasks_.push(tk);
     for (auto &fdst : tk->wait_fds_)
     {
@@ -80,6 +83,10 @@ void IoWait::SchedulerSwitch(Task* tk)
                 tk->DebugInfo(), fdst.fd, fdst.event);
     }
 
+    DebugPrint(dbg_ioblock, "task(%s) SchedulerSwitch id=%d, nfds=%d, timeout=%d, ok=%s",
+            tk->DebugInfo(), id, (int)tk->wait_fds_.size(), tk->io_block_timeout_,
+            ok ? "true" : "false");
+
     if (!ok) {
         if (wait_tasks_.erase(tk)) {
             g_Scheduler.AddTaskRunnable(tk);
@@ -88,21 +95,27 @@ void IoWait::SchedulerSwitch(Task* tk)
     else if (tk->io_block_timeout_ != -1) {
         // set timer.
         tk->IncrementRef();
-        tk->io_block_timer_ = timer_mgr_.ExpireAt(std::chrono::milliseconds(tk->io_block_timeout_),
+        uint64_t task_id = tk->id_;
+        auto timer_id = timer_mgr_.ExpireAt(std::chrono::milliseconds(tk->io_block_timeout_),
                 [=]{ 
+                    DebugPrint(dbg_ioblock, "task(%d) syscall timeout", (int)task_id);
                     this->Cancel(tk, id);
                     tk->DecrementRef();
                 });
+        tk->io_block_timer_ = timer_id;
     }
 }
 
 void IoWait::Cancel(Task *tk, uint32_t id)
 {
+    DebugPrint(dbg_ioblock, "task(%s) Cancel id=%d, tk->io_block_id_=%d",
+            tk->DebugInfo(), id, (int)tk->io_block_id_);
+
     if (tk->io_block_id_ != id)
         return ;
 
     if (wait_tasks_.erase(tk)) { // sync between timer and epoll_wait.
-        DebugPrint(dbg_ioblock, "task(%s) io_block wakeup.", tk->DebugInfo());
+        DebugPrint(dbg_ioblock, "task(%s) io_block wakeup. id=%d", tk->DebugInfo(), id);
 
         std::unique_lock<LFLock> lock(tk->io_block_lock_, std::defer_lock);
         if (tk->wait_fds_.size() > 1)
@@ -161,14 +174,15 @@ retry:
 
     for (auto &st : epollwait_tasks_)
         Cancel(st.tk, st.id);
+    epollwait_tasks_.clear();
 
+    std::list<CoTimerPtr> timeout_list;
     {
-        std::list<CoTimerPtr> timeout_list;
         std::unique_lock<LFLock> lock(timeout_list_lock_);
         timeout_list_.swap(timeout_list);
     }
 
-    for (auto &cb : timeout_list_)
+    for (auto &cb : timeout_list)
         (*cb)();
 
     // 由于epoll_wait的结果中会残留一些未计数的Task*,

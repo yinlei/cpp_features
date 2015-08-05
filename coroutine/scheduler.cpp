@@ -39,6 +39,7 @@ void Scheduler::CreateTask(TaskF const& fn)
     Task* tk = new Task(fn, GetOptions().stack_size);
     if (tk->state_ == TaskState::fatal) {
         // 创建失败
+        assert(false);
         delete tk;
         throw std::system_error(errno, std::system_category());
         return ;

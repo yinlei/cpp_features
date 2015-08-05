@@ -51,7 +51,7 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-//    g_Scheduler.GetOptions().debug = dbg_ioblock | dbg_hook;
+//    g_Scheduler.GetOptions().debug = dbg_all;
 //    g_Scheduler.GetOptions().debug_output = fopen("log", "w+");
 
     int concurrency = atoi(argv[2]);

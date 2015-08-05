@@ -72,11 +72,10 @@ runnable *          v
          *
 *************************************************/
 #pragma once
-#include "task.h"
-#include "timer.h"
 #include <vector>
 #include <list>
 #include <set>
+#include "task.h"
 
 class IoWait
 {

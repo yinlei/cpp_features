@@ -85,3 +85,31 @@ TEST_P(ThreadsTimer, OnTime4)
 
 INSTANTIATE_TEST_CASE_P(OnThreadsTimer, ThreadsTimer, Values(2, 4, 8));
 
+TEST(ThreadsTimer, Cancel)
+{
+    g_Scheduler.GetOptions().debug = dbg_none;
+
+    bool executed = false;
+    auto timer_id = co_timer_add(std::chrono::seconds(0), [&]{
+                executed = true;
+            });
+    g_Scheduler.Run();
+    EXPECT_TRUE(executed);
+
+    executed = false;
+    timer_id = co_timer_add(std::chrono::seconds(0), [&]{
+                executed = true;
+            });
+    EXPECT_TRUE(co_timer_cancel(timer_id));
+    g_Scheduler.Run();
+    EXPECT_FALSE(executed);
+
+    executed = false;
+    timer_id = co_timer_add(std::chrono::seconds(0), [&]{
+                executed = true;
+            });
+    g_Scheduler.Run();
+    EXPECT_FALSE(co_timer_cancel(timer_id));
+    EXPECT_TRUE(executed);
+}
+

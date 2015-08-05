@@ -52,7 +52,7 @@ static void C_func(Task* self)
 
 Task::Task(TaskF const& fn, int stack_size)
     : id_(++s_id), state_(TaskState::runnable), yield_count_(0),
-    fn_(fn), ref_count_{1}, block_(NULL)
+    fn_(fn), stack_(NULL), ref_count_{1}, block_(NULL)
 {
     ++s_task_count;
     stack_ = new char[stack_size];
@@ -78,7 +78,10 @@ Task::Task(TaskF const& fn, int stack_size)
 Task::~Task()
 {
     --s_task_count;
-    delete []stack_;
+    if (stack_) {
+        delete []stack_;
+        stack_ = NULL;
+    }
 }
 
 void Task::SetDebugInfo(std::string const& info)
@@ -109,5 +112,38 @@ std::size_t Task::GetDeletedTaskCount()
 {
     std::unique_lock<LFLock> lock(s_delete_list_lock);
     return s_delete_list.size();
+}
+
+void Task::IncrementRef()
+{
+    DebugPrint(dbg_task, "task(%s) IncrementRef ref=%d",
+            DebugInfo(), (int)ref_count_);
+    ++ref_count_;
+}
+
+void Task::DecrementRef()
+{
+    DebugPrint(dbg_task, "task(%s) DecrementRef ref=%d",
+            DebugInfo(), (int)ref_count_);
+    if (--ref_count_ == 0) {
+        std::unique_lock<LFLock> lock(s_delete_list_lock);
+        assert(!this->prev);
+        assert(!this->next);
+        assert(!this->check_);
+        s_delete_list.push_back(this);
+    }
+}
+
+RefGuard::RefGuard(Task* tk) : tk_(tk)
+{
+    tk_->IncrementRef();
+}
+RefGuard::RefGuard(Task& tk) : tk_(&tk)
+{
+    tk_->IncrementRef();
+}
+RefGuard::~RefGuard()
+{
+    tk_->DecrementRef();
 }
 

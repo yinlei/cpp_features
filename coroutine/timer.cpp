@@ -29,6 +29,7 @@ bool CoTimer::Cancel()
     if (!lock.try_lock()) return false;
 
     // below statement was locked.
+    if (!active_) return false;
     active_ = false;
     return true;
 }
