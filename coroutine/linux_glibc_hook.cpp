@@ -42,7 +42,7 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
             bool is_timeout = false;
             if (tk->io_block_timer_) {
                 is_timeout = true;
-                if (g_Scheduler.CancelTimer(tk->io_block_timer_)) {
+                if (g_Scheduler.BlockCancelTimer(tk->io_block_timer_)) {
                     is_timeout = false;
                     tk->DecrementRef(); // timer use ref.
                 }
@@ -289,7 +289,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     bool is_timeout = false; // 是否超时
     if (tk->io_block_timer_) {
         is_timeout = true;
-        if (g_Scheduler.CancelTimer(tk->io_block_timer_)) {
+        if (g_Scheduler.BlockCancelTimer(tk->io_block_timer_)) {
             tk->DecrementRef(); // timer use ref.
             is_timeout = false;
         }
