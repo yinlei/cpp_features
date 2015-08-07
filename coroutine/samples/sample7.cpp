@@ -2,8 +2,13 @@
  * coroutine sample7
 ************************************************
  * coroutine库原生提供了一个线程安全的定时器
- * 协程内外均可使用.
- * 加入定时器的回调函数会在调度器Run时被触发.
+ *  协程内外均可使用. 加入定时器的回调函数会在调度器Run时被触发.
+ *
+ * 还提供了休眠当前协程的方法co_sleep，类似于系统调用sleep.
+ * 同时HOOK了系统调用sleep、nanosleep, 在协程中使用这两个系统
+ * 调用, 会自动变为co_sleep, 协程外使用效果不变.
+ *
+ * 注意: 没有HOOK usleep系统调用, 协程中不要使用.
 ************************************************/
 #include <chrono>
 #include "coroutine.h"
@@ -32,6 +37,13 @@ int main()
             printf("Timer Callback.\n");
             is_exit = true;
             });
+
+    for (int i = 0; i < 100; ++i)
+        go []{
+            // 休眠当前协程 1000 milliseconds.
+            // 不会阻塞线程, 因此100个并发的休眠, 总共只需要1秒.
+            co_sleep(1000);
+        };
 
     while (!is_exit)
         g_Scheduler.Run();
