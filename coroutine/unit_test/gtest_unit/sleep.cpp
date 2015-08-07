@@ -28,7 +28,7 @@ void do_sleep(sleep_type type, int timeout)
 
         case sleep_type::syscall_nanosleep:
             {
-                timespec tv{timeout / 1000, timeout % 1000};
+                timespec tv{timeout / 1000, ((long int)timeout % 1000) * 1000000};
                 nanosleep(&tv, NULL);
             }
             break;
@@ -79,7 +79,7 @@ TEST_P(Sleep, sleep1)
     int c = 0, n = 2;
     for (int i = 0; i < n; ++i)
         go [&c, this]{
-            do_sleep(type_, 1000);
+            do_sleep(type_, 1030);
             ++c;
         };
 
@@ -88,7 +88,7 @@ TEST_P(Sleep, sleep1)
     auto e = chrono::system_clock::now();
     auto dc = chrono::duration_cast<chrono::milliseconds>(e - s).count();
     EXPECT_EQ(c, n);
-    EXPECT_LT(dc, 1050);
+    EXPECT_LT(dc, 1100);
     EXPECT_GT(dc, 1000);
 }
 

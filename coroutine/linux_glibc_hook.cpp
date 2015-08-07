@@ -344,7 +344,7 @@ unsigned int sleep(unsigned int seconds)
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
     Task* tk = g_Scheduler.GetCurrentTask();
-    int timeout_ms = req->tv_sec * 1000 + req->tv_nsec / 1000;
+    int timeout_ms = req->tv_sec * 1000 + req->tv_nsec / 1000000;
     DebugPrint(dbg_hook, "task(%s) hook nanosleep(milliseconds=%d). %s coroutine.",
             tk ? tk->DebugInfo() : "nil", timeout_ms,
             g_Scheduler.IsCoroutine() ? "In" : "Not in");
