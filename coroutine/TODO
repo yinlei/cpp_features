@@ -1,9 +1,6 @@
 TODO:
-正确处理Add into epoll, add into wait_list, set timer And epoll_wait, cancel这几件事的同步关系
-支持sleep usleep nanosleep
-支持poll(NULL, 0, 1000);这种用来做sleep的用法
 添加类似channel的特性
-
+移植Windows
 
 DONE:
 支持exception
@@ -15,3 +12,5 @@ HOOK select poll
 支持asio
 降低空转时的cpu资源占用
 解决http性能测试出现error, 无法加入epoll的问题
+支持sleep nanosleep poll(timeout)
+正确处理Add into epoll, add into wait_list, set timer And epoll_wait, cancel这几件事的同步关系

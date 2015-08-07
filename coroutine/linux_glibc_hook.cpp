@@ -116,6 +116,12 @@ static poll_t poll_f = NULL;
 typedef int(*accept_t)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 static accept_t accept_f = NULL;
 
+typedef unsigned int(*sleep_t)(unsigned int seconds);
+static sleep_t sleep_f = NULL;
+
+typedef int(*nanosleep_t)(const struct timespec *req, struct timespec *rem);
+static nanosleep_t nanosleep_f = NULL;
+
 int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 {
     Task* tk = g_Scheduler.GetCurrentTask();
@@ -272,7 +278,9 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
         return poll_f(fds, nfds, timeout);
 
     if (nfds == 0) {
-        // TODO: nanosleep
+        // co sleep
+        g_Scheduler.SleepSwitch(timeout);
+        return 0;
     }
 
     std::vector<FdStruct> fdsts;
@@ -298,8 +306,12 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     if (tk->wait_successful_ == 0) {
         if (is_timeout)
             return 0;
-        else
+        else {
+            // 加入epoll失败
+            if (timeout)
+                g_Scheduler.SleepSwitch(timeout);
             return poll_f(fds, nfds, 0);
+        }
     }
 
     int n = 0;
@@ -312,6 +324,36 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     assert(n == (int)tk->wait_successful_);
 
     return n;
+}
+
+unsigned int sleep(unsigned int seconds)
+{
+    Task* tk = g_Scheduler.GetCurrentTask();
+    DebugPrint(dbg_hook, "task(%s) hook sleep(seconds=%u). %s coroutine.",
+            tk ? tk->DebugInfo() : "nil", seconds,
+            g_Scheduler.IsCoroutine() ? "In" : "Not in");
+
+    if (!g_Scheduler.IsCoroutine())
+        return sleep_f(seconds);
+
+    int timeout_ms = seconds * 1000;
+    g_Scheduler.SleepSwitch(timeout_ms);
+    return 0;
+}
+
+int nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    Task* tk = g_Scheduler.GetCurrentTask();
+    int timeout_ms = req->tv_sec * 1000 + req->tv_nsec / 1000;
+    DebugPrint(dbg_hook, "task(%s) hook nanosleep(milliseconds=%d). %s coroutine.",
+            tk ? tk->DebugInfo() : "nil", timeout_ms,
+            g_Scheduler.IsCoroutine() ? "In" : "Not in");
+
+    if (!g_Scheduler.IsCoroutine())
+        return nanosleep_f(req, rem);
+
+    g_Scheduler.SleepSwitch(timeout_ms);
+    return 0;
 }
 
 #if !defined(CO_DYNAMIC_LINK)
@@ -330,6 +372,8 @@ extern ssize_t __sendto(int sockfd, const void *buf, size_t len, int flags,
 extern ssize_t __sendmsg(int sockfd, const struct msghdr *msg, int flags);
 extern int __libc_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 extern int __poll(struct pollfd *fds, nfds_t nfds, int timeout);
+extern unsigned int __sleep(unsigned int seconds);
+extern int __nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
 }
 
@@ -349,6 +393,8 @@ void coroutine_hook_init()
     sendmsg_f = (sendmsg_t)dlsym(RTLD_NEXT, "sendmsg");
     accept_f = (accept_t)dlsym(RTLD_NEXT, "accept");
     poll_f = (poll_t)dlsym(RTLD_NEXT, "poll");
+    sleep_f = (sleep_t)dlsym(RTLD_NEXT, "sleep");
+    nanosleep_f = (nanosleep_t)dlsym(RTLD_NEXT, "nanosleep");
 #else
     connect_f = &__connect;
     read_f = &__read;
@@ -363,6 +409,8 @@ void coroutine_hook_init()
     sendmsg_f = &__sendmsg;
     accept_f = &__libc_accept;
     poll_f = &__poll;
+    sleep_f = &__sleep;
+    nanosleep_f = &__nanosleep;
 #endif
 
     if (!connect_f || !read_f || !write_f || !readv_f || !writev_f) {

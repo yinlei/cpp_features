@@ -11,9 +11,10 @@
 enum class TaskState
 {
     runnable,
-    io_block,    // write, writev, read, select, poll, ...
-    sys_block,  // mutex, pthread_lock, ...
-    user_block,  // mutex, pthread_lock, ...
+    io_block,       // write, writev, read, select, poll, ...
+    sys_block,      // co_mutex, ...
+    user_block,     // user switch it.
+    sleep,          // sleep nanosleep poll(NULL, 0, timeout)
     done,
     fatal,
 };
@@ -66,6 +67,8 @@ struct Task
     int64_t user_wait_type_;            // user_block等待的类型
     uint64_t user_wait_id_;             // user_block等待的id
     BlockObject* block_;                // sys_block等待的block对象
+
+    int sleep_ms_;                      // 睡眠时间
 
     explicit Task(TaskF const& fn, int stack_size);
     ~Task();

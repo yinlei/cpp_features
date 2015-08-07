@@ -84,8 +84,11 @@ uint32_t Scheduler::Run()
     // timer
     uint32_t tm_count = DoTimer();
 
-    if (!run_count && ep_count <= 0 && !tm_count) {
-        DebugPrint(dbg_sleep, "sleep %d ms", (int)sleep_ms_);
+    // sleep wait.
+    uint32_t sl_count = DoSleep();
+
+    if (!run_count && ep_count <= 0 && !tm_count && !sl_count) {
+        DebugPrint(dbg_scheduler_sleep, "sleep %d ms", (int)sleep_ms_);
         sleep_ms_ = std::min(++sleep_ms_, GetOptions().max_sleep_ms);
         usleep(sleep_ms_ * 1000);
     } else {
@@ -155,6 +158,12 @@ uint32_t Scheduler::DoRunnable()
                     io_wait_.SchedulerSwitch(tk);
                     break;
 
+                case TaskState::sleep:
+                    --runnable_task_count_;
+                    it = slist.erase(it);
+                    sleep_wait_.SchedulerSwitch(tk);
+                    break;
+
                 case TaskState::sys_block:
                 case TaskState::user_block:
                     {
@@ -212,6 +221,11 @@ uint32_t Scheduler::DoRunnable()
 int Scheduler::DoEpoll()
 {
     return io_wait_.WaitLoop();
+}
+
+uint32_t Scheduler::DoSleep()
+{
+    return sleep_wait_.WaitLoop();
 }
 
 // Run函数的一部分, 处理定时器
@@ -298,6 +312,14 @@ void Scheduler::IOBlockSwitch(int fd, uint32_t event, int timeout_ms)
 void Scheduler::IOBlockSwitch(std::vector<FdStruct> &fdsts, int timeout_ms)
 {
     io_wait_.CoSwitch(fdsts, timeout_ms);
+}
+
+void Scheduler::SleepSwitch(int timeout_ms)
+{
+    if (timeout_ms <= 0)
+        Yield();
+    else
+        sleep_wait_.CoSwitch(timeout_ms);
 }
 
 bool Scheduler::UserBlockWait(uint32_t type, uint64_t wait_id)

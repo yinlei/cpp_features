@@ -17,6 +17,9 @@ struct __go
 #define co_wait(type, id) do { Scheduler::getInstance().UserBlockWait(type, id); } while (0)
 #define co_wakeup(type, id) do { Scheduler::getInstance().UserBlockWakeup(type, id); } while (0)
 
+// coroutine sleep, never blocks current thread.
+#define co_sleep(milliseconds) do { Scheduler::getInstance().SleepSwitch(milliseconds); } while (0)
+
 // co_mutex
 
 // co_timer_add will returns timer_id; The timer_id type is uint64_t.

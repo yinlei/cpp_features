@@ -10,6 +10,7 @@
 #include "co_mutex.h"
 #include "timer.h"
 #include "io_wait.h"
+#include "sleep_wait.h"
 
 #define DebugPrint(type, fmt, ...) \
     do { \
@@ -32,7 +33,8 @@ static const uint64_t dbg_wait = 0x1 << 6;
 static const uint64_t dbg_exception = 0x1 << 7;
 static const uint64_t dbg_syncblock = 0x1 << 8;
 static const uint64_t dbg_timer = 0x1 << 9;
-static const uint64_t dbg_sleep = 0x1 << 10;
+static const uint64_t dbg_scheduler_sleep = 0x1 << 10;
+static const uint64_t dbg_sleepblock = 0x1 << 11;
 ///-------------------
 
 // 协程中抛出未捕获异常时的处理方式
@@ -134,8 +136,11 @@ class Scheduler
     public:
         /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
         void IOBlockSwitch(int fd, uint32_t event, int timeout_ms);
-
         void IOBlockSwitch(std::vector<FdStruct> &fdsts, int timeout_ms);
+
+        /// sleep switch
+        //  \timeout_ms min value is 0.
+        void SleepSwitch(int timeout_ms);
 
         /// ------------------------------------------------------------------------
         // @{ 以计数的方式模拟实现的协程同步方式. 
@@ -209,6 +214,9 @@ class Scheduler
         // Run函数的一部分, 处理epoll相关
         int DoEpoll();
 
+        // Run函数的一部分, 处理sleep相关
+        uint32_t DoSleep();
+
         // Run函数的一部分, 处理定时器
         uint32_t DoTimer();
 
@@ -218,8 +226,11 @@ class Scheduler
         // List of task.
         TaskList run_tasks_;
 
-        // epoll, io block waiter.
+        // io block waiter.
         IoWait io_wait_;
+
+        // sleep block waiter.
+        SleepWait sleep_wait_;
 
         // User define wait tasks table.
         WaitTable user_wait_tasks_;
@@ -237,6 +248,7 @@ class Scheduler
     friend class CoMutex;
     friend class BlockObject;
     friend class IoWait;
+    friend class SleepWait;
 };
 
 #define g_Scheduler Scheduler::getInstance()

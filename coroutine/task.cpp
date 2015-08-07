@@ -52,7 +52,8 @@ static void C_func(Task* self)
 
 Task::Task(TaskF const& fn, int stack_size)
     : id_(++s_id), state_(TaskState::runnable), yield_count_(0),
-    fn_(fn), stack_(NULL), ref_count_{1}, block_(NULL)
+    fn_(fn), stack_(NULL), ref_count_{1}, block_(NULL),
+    sleep_ms_(0)
 {
     ++s_task_count;
     stack_ = new char[stack_size];
