@@ -1,6 +1,6 @@
 TODO:
-HOOK socket函数族其他可能阻塞的函数，比如close, resolve.
 添加类似channel的特性
+尝试HOOK socket函数族其他可能阻塞的函数，比如getaddrbyname
 考虑移植Windows: 1.HOOK WINAPI, boost.asio替代epoll 2.ucontext->boost.context
 
 DONE:
@@ -8,10 +8,11 @@ DONE:
 优化co_mutex, 为BlockWait抽象出一个WaitObject, 管理等待中的协程, 以免不同的WaitObject竞争同一个全局锁
 阻塞socket的超时设置(RECVTIMEO, SENDTIMEO)在协程中处理
 修复gtest单元测试代码链接错误的问题
-HOOK select poll
+支持poll
 支持accept
 支持asio
 降低空转时的cpu资源占用
 解决http性能测试出现error, 无法加入epoll的问题
 支持sleep nanosleep poll(timeout)
 正确处理Add into epoll, add into wait_list, set timer And epoll_wait, cancel这几件事的同步关系
+支持select 

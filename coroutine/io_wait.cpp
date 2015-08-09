@@ -13,7 +13,7 @@ IoWait::IoWait()
     }
 }
 
-void IoWait::CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms)
+void IoWait::CoSwitch(std::vector<FdStruct> && fdsts, int timeout_ms)
 {
     // TODO: 支持同一个fd被多个协程等待
     Task* tk = g_Scheduler.GetCurrentTask();
@@ -21,14 +21,13 @@ void IoWait::CoSwitch(std::vector<FdStruct> & fdsts, int timeout_ms)
 
     uint32_t id = ++tk->io_block_id_;
     tk->state_ = TaskState::io_block;
-    tk->wait_fds_.clear();
     tk->wait_successful_ = 0;
     tk->io_block_timeout_ = timeout_ms;
     tk->io_block_timer_.reset();
-    for (auto &fdst : fdsts) {
+    tk->wait_fds_.swap(fdsts);
+    for (auto &fdst : tk->wait_fds_) {
         fdst.epoll_ptr.tk = tk;
         fdst.epoll_ptr.io_block_id = id;
-        tk->wait_fds_.push_back(fdst);
     }
 
     DebugPrint(dbg_ioblock, "task(%s) CoSwitch id=%d, nfds=%d, timeout=%d",

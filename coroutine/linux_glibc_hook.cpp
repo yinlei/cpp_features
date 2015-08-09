@@ -13,64 +13,63 @@ ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t e
     DebugPrint(dbg_hook, "task(%s) hook %s. %s coroutine.",
             tk ? tk->DebugInfo() : "nil", hook_fn_name, g_Scheduler.IsCoroutine() ? "In" : "Not in");
 
-    if (!tk) {
+    if (!tk)
         return fn(fd, std::forward<Args>(args)...);
-    } else {
-        int flags = fcntl(fd, F_GETFL, 0);
-        if (flags & O_NONBLOCK)
-            return fn(fd, std::forward<Args>(args)...);
 
-        if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
-            return fn(fd, std::forward<Args>(args)...);
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags & O_NONBLOCK)
+        return fn(fd, std::forward<Args>(args)...);
 
-        ssize_t n = fn(fd, std::forward<Args>(args)...);
-        if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            // get timeout option.
-            int timeout_ms = -1;
-            struct timeval timeout;
-            socklen_t timeout_blen = sizeof(timeout);
-            if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
-                if (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
-                    timeout_ms = timeout.tv_sec * 1000 + timeout.tv_usec / 1000;
-                    DebugPrint(dbg_hook, "hook task(%s) %s timeout=%dms. fd=%d",
-                            g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, timeout_ms, fd);
-                }
+    if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
+        return fn(fd, std::forward<Args>(args)...);
+
+    ssize_t n = fn(fd, std::forward<Args>(args)...);
+    if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        // get timeout option.
+        int timeout_ms = -1;
+        struct timeval timeout;
+        socklen_t timeout_blen = sizeof(timeout);
+        if (0 == getsockopt(fd, SOL_SOCKET, timeout_so, &timeout, &timeout_blen)) {
+            if (timeout.tv_sec > 0 || timeout.tv_usec > 0) {
+                timeout_ms = timeout.tv_sec * 1000 + timeout.tv_usec / 1000;
+                DebugPrint(dbg_hook, "hook task(%s) %s timeout=%dms. fd=%d",
+                        g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, timeout_ms, fd);
             }
-
-            // add into epoll, and switch other context.
-            g_Scheduler.IOBlockSwitch(fd, event, timeout_ms);
-            bool is_timeout = false;
-            if (tk->io_block_timer_) {
-                is_timeout = true;
-                if (g_Scheduler.BlockCancelTimer(tk->io_block_timer_)) {
-                    is_timeout = false;
-                    tk->DecrementRef(); // timer use ref.
-                }
-            }
-
-            if (tk->wait_successful_ == 0) {
-                if (is_timeout) {
-                    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-                    errno = EAGAIN;
-                    return -1;
-                } else {
-                    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-                    return fn(fd, std::forward<Args>(args)...);
-                }
-            }
-
-            DebugPrint(dbg_hook, "continue task(%s) %s. fd=%d", g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
-            n = fn(fd, std::forward<Args>(args)...);
-        } else {
-            DebugPrint(dbg_hook, "task(%s) syscall(%s) completed immediately. fd=%d",
-                    g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
         }
 
-        int e = errno;
-        fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-        errno = e;
-        return n;
+        // add into epoll, and switch other context.
+        g_Scheduler.IOBlockSwitch(fd, event, timeout_ms);
+        bool is_timeout = false;
+        if (tk->io_block_timer_) {
+            is_timeout = true;
+            if (g_Scheduler.BlockCancelTimer(tk->io_block_timer_)) {
+                is_timeout = false;
+                tk->DecrementRef(); // timer use ref.
+            }
+        }
+
+        if (tk->wait_successful_ == 0) {
+            if (is_timeout) {
+                fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+                errno = EAGAIN;
+                return -1;
+            } else {
+                fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+                return fn(fd, std::forward<Args>(args)...);
+            }
+        }
+
+        DebugPrint(dbg_hook, "continue task(%s) %s. fd=%d", g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
+        n = fn(fd, std::forward<Args>(args)...);
+    } else {
+        DebugPrint(dbg_hook, "task(%s) syscall(%s) completed immediately. fd=%d",
+                g_Scheduler.GetCurrentTaskDebugInfo(), hook_fn_name, fd);
     }
+
+    int e = errno;
+    fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
+    errno = e;
+    return n;
 }
 
 extern "C" {
@@ -112,6 +111,10 @@ static sendmsg_t sendmsg_f = NULL;
 
 typedef int(*poll_t)(struct pollfd *fds, nfds_t nfds, int timeout);
 static poll_t poll_f = NULL;
+
+typedef int(*select_t)(int nfds, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, struct timeval *timeout);
+static select_t select_f = NULL;
 
 typedef int(*accept_t)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 static accept_t accept_f = NULL;
@@ -293,7 +296,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     }
 
     // add into epoll, and switch other context.
-    g_Scheduler.IOBlockSwitch(fdsts, timeout);
+    g_Scheduler.IOBlockSwitch(std::move(fdsts), timeout);
     bool is_timeout = false; // 是否超时
     if (tk->io_block_timer_) {
         is_timeout = true;
@@ -308,7 +311,7 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
             return 0;
         else {
             // 加入epoll失败
-            if (timeout)
+            if (timeout > 0)
                 g_Scheduler.SleepSwitch(timeout);
             return poll_f(fds, nfds, 0);
         }
@@ -322,6 +325,106 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
     }
 
     assert(n == (int)tk->wait_successful_);
+
+    return n;
+}
+
+int select(int nfds, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, struct timeval *timeout)
+{
+    int timeout_ms = -1;
+    if (timeout)
+        timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
+
+    Task* tk = g_Scheduler.GetCurrentTask();
+    DebugPrint(dbg_hook, "task(%s) hook select(nfds=%d, rd_set=%p, wr_set=%p, er_set=%p, timeout=%d ms).",
+            tk ? tk->DebugInfo() : "nil",
+            (int)nfds, readfds, writefds, exceptfds, timeout_ms);
+
+    if (!tk)
+        return select_f(nfds, readfds, writefds, exceptfds, timeout);
+
+    if (timeout_ms == 0)
+        return select_f(nfds, readfds, writefds, exceptfds, timeout);
+
+    if (!nfds && !readfds && !writefds && !exceptfds && timeout) {
+        g_Scheduler.SleepSwitch(timeout_ms);
+        return 0;
+    }
+
+    nfds = std::min<int>(nfds, FD_SETSIZE);
+    std::pair<fd_set*, uint32_t> sets[3] =
+    {
+        {readfds, EPOLLIN | EPOLLERR | EPOLLHUP},
+        {writefds, EPOLLOUT},
+        {exceptfds, EPOLLERR | EPOLLHUP}
+    };
+
+    static const char* set_names[] = {"readfds", "writefds", "exceptfds"};
+    std::vector<FdStruct> fdsts;
+    for (int i = 0; i < nfds; ++i) {
+        FdStruct *fdst = NULL;
+        for (int si = 0; si < 3; ++si) {
+            if (!sets[si].first)
+                continue;
+
+            if (!FD_ISSET(i, sets[si].first))
+                continue;
+
+            if (!fdst) {
+                fdsts.emplace_back();
+                fdst = &fdsts.back();
+                fdst->fd = i;
+            }
+
+            fdsts.back().event |= sets[si].second;
+            DebugPrint(dbg_hook, "task(%s) hook select %s(%d)",
+                    tk->DebugInfo(), set_names[si], (int)i);
+        }
+    }
+
+    g_Scheduler.IOBlockSwitch(std::move(fdsts), timeout_ms);
+    bool is_timeout = false;
+    if (tk->io_block_timer_) {
+        is_timeout = true;
+        if (g_Scheduler.BlockCancelTimer(tk->io_block_timer_)) {
+            is_timeout = false;
+            tk->DecrementRef(); // timer use ref.
+        }
+    }
+
+    if (tk->wait_successful_ == 0) {
+        if (is_timeout) {
+            if (readfds) FD_ZERO(readfds);
+            if (writefds) FD_ZERO(writefds);
+            if (exceptfds) FD_ZERO(exceptfds);
+            return 0;
+        } else {
+            if (timeout_ms > 0)
+                g_Scheduler.SleepSwitch(timeout_ms);
+            timeval immedaitely = {0, 0};
+            return select_f(nfds, readfds, writefds, exceptfds, &immedaitely);
+        }
+    }
+
+    int n = 0;
+    for (auto &fdst : tk->wait_fds_) {
+        int fd = fdst.fd;
+        for (int si = 0; si < 3; ++si) {
+            if (!sets[si].first)
+                continue;
+
+            if (!FD_ISSET(fd, sets[si].first))
+                continue;
+
+            if (sets[si].second & fdst.epoll_ptr.revent) {
+                ++n;
+                continue;
+            }
+
+            FD_CLR(fd, sets[si].first);
+        }
+    }
 
     return n;
 }
@@ -372,6 +475,8 @@ extern ssize_t __sendto(int sockfd, const void *buf, size_t len, int flags,
 extern ssize_t __sendmsg(int sockfd, const struct msghdr *msg, int flags);
 extern int __libc_accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
 extern int __poll(struct pollfd *fds, nfds_t nfds, int timeout);
+extern int __select(int nfds, fd_set *readfds, fd_set *writefds,
+                          fd_set *exceptfds, struct timeval *timeout);
 extern unsigned int __sleep(unsigned int seconds);
 extern int __nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
@@ -393,6 +498,7 @@ void coroutine_hook_init()
     sendmsg_f = (sendmsg_t)dlsym(RTLD_NEXT, "sendmsg");
     accept_f = (accept_t)dlsym(RTLD_NEXT, "accept");
     poll_f = (poll_t)dlsym(RTLD_NEXT, "poll");
+    select_f = (select_t)dlsym(RTLD_NEXT, "select");
     sleep_f = (sleep_t)dlsym(RTLD_NEXT, "sleep");
     nanosleep_f = (nanosleep_t)dlsym(RTLD_NEXT, "nanosleep");
 #else
@@ -409,6 +515,7 @@ void coroutine_hook_init()
     sendmsg_f = &__sendmsg;
     accept_f = &__libc_accept;
     poll_f = &__poll;
+    select_f = &__select;
     sleep_f = &__sleep;
     nanosleep_f = &__nanosleep;
 #endif

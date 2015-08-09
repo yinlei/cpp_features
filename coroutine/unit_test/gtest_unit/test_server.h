@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #define assert_false(expr) assert(!(expr))
+#define TEST_PORT 43222
 
 struct TestServer
 {
@@ -41,7 +42,7 @@ struct TestServer
 
         sockaddr_in addr;
         addr.sin_family = AF_INET;
-        addr.sin_port = htons(43222);
+        addr.sin_port = htons(TEST_PORT);
         addr.sin_addr.s_addr = inet_addr("127.0.0.1");
         n = bind(accept_fd_, (sockaddr*)&addr, sizeof(addr));
         assert_false(n == -1);
