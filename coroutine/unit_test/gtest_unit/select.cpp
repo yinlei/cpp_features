@@ -108,8 +108,8 @@ static timeval zero_timeout = {0, 0};
 
 TEST(Select, TimeoutIs0)
 {
-    g_Scheduler.GetOptions().debug = dbg_all;
-    g_Scheduler.GetOptions().debug_output = fopen("log", "w+");
+//    g_Scheduler.GetOptions().debug = dbg_all;
+//    g_Scheduler.GetOptions().debug_output = fopen("log", "w+");
     go [] {
         fd_set wr_fds;
         auto x = CreateFds(&wr_fds, 2);

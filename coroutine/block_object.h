@@ -6,14 +6,13 @@ class BlockObject
 {
 protected:
     friend class Scheduler;
-    uint32_t wakeup_;
-    uint32_t max_wakeup_;
+    std::size_t wakeup_;
+    std::size_t max_wakeup_;
     TSQueue<Task, false> wait_queue_;
     LFLock lock_;
 
 public:
-    BlockObject();
-    explicit BlockObject(uint32_t max_wakeup);
+    explicit BlockObject(std::size_t init_wakeup = 0, std::size_t max_wakeup = -1);
     ~BlockObject();
 
     void CoBlockWait();

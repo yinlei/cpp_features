@@ -1,5 +1,6 @@
 #pragma once
 #include "scheduler.h"
+#include "channel.h"
 
 struct __go
 {
@@ -21,6 +22,10 @@ struct __go
 #define co_sleep(milliseconds) do { Scheduler::getInstance().SleepSwitch(milliseconds); } while (0)
 
 // co_mutex
+
+// co_channel
+template <typename T>
+using co_chan = Channel<T>;
 
 // co_timer_add will returns timer_id; The timer_id type is uint64_t.
 template <typename Arg, typename F>

@@ -4,8 +4,8 @@
 #include <assert.h>
 
 CoMutex::CoMutex()
+    : block_(1)
 {
-    block_.Wakeup();
 }
 
 void CoMutex::lock()

@@ -134,7 +134,8 @@ TEST(Poll, TimeoutIs1)
         FreePollfds(fds);
         n = poll(fds, 2, 1000);
         EXPECT_EQ(n, 0);
-        EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), 3);
+        // two times switch: io_wait and sleep.
+        EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), 4);
     };
     g_Scheduler.RunUntilNoTask();
     EXPECT_EQ(Task::GetTaskCount(), 0);

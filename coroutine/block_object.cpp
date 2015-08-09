@@ -5,12 +5,8 @@
 #include <mutex>
 #include <limits>
 
-BlockObject::BlockObject()
-    : wakeup_(0), max_wakeup_(std::numeric_limits<uint32_t>::max())
-{}
-
-BlockObject::BlockObject(uint32_t max_wakeup)
-    : wakeup_(0), max_wakeup_(max_wakeup)
+BlockObject::BlockObject(std::size_t init_wakeup, std::size_t max_wakeup)
+    : wakeup_(init_wakeup), max_wakeup_(max_wakeup)
 {}
 
 BlockObject::~BlockObject()
@@ -27,7 +23,7 @@ BlockObject::~BlockObject()
 void BlockObject::CoBlockWait()
 {
     if (!g_Scheduler.IsCoroutine()) {
-        while (!TryBlockWait()) sleep(1);
+        while (!TryBlockWait()) usleep(10 * 1000);
         return ;
     }
 
