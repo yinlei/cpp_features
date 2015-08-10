@@ -48,6 +48,7 @@ void IoWait::SchedulerSwitch(Task* tk)
 
     RefGuard ref_guard(tk);
     wait_tasks_.push(tk);
+    std::vector<int> rollback_list;
     for (auto &fdst : tk->wait_fds_)
     {
         epoll_event ev = {fdst.event, {(void*)&fdst.epoll_ptr}};
@@ -60,11 +61,11 @@ void IoWait::SchedulerSwitch(Task* tk)
                 DebugPrint(dbg_ioblock, "task(%s) add fd(%d) into epoll error %d:%s\n",
                         tk->DebugInfo(), fdst.fd, errno, strerror(errno));
                 // 某个fd添加失败, 回滚
-                for (auto &fdst : tk->wait_fds_)
+                for (auto fd : rollback_list)
                 {
-                    if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fdst.fd, NULL)) {
+                    if (0 == epoll_ctl(epoll_fd_, EPOLL_CTL_DEL, fd, NULL)) {
                         DebugPrint(dbg_ioblock, "task(%s) rollback io_block. fd=%d",
-                                tk->DebugInfo(), fdst.fd);
+                                tk->DebugInfo(), fd);
                         // 减引用计数的条件：谁成功从epoll中删除了一个fd，谁才能减引用计数。
                         tk->DecrementRef();
                     }
@@ -78,6 +79,7 @@ void IoWait::SchedulerSwitch(Task* tk)
         }
 
         ok = true;
+        rollback_list.push_back(fdst.fd);
         DebugPrint(dbg_ioblock, "task(%s) io_block. fd=%d, ev=%d",
                 tk->DebugInfo(), fdst.fd, fdst.event);
     }
