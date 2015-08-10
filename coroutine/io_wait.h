@@ -93,6 +93,8 @@ public:
 private:
     void Cancel(Task *tk, uint32_t id);
 
+    int ChooseEpoll(uint32_t event);
+
     struct EpollWaitSt
     {
         Task* tk;
@@ -103,7 +105,7 @@ private:
         }
     };
 
-    int epoll_fd_;
+    int epoll_fds_[2];
     LFLock epoll_lock_;
     std::set<EpollWaitSt> epollwait_tasks_;
     std::list<CoTimerPtr> timeout_list_;
