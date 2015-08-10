@@ -22,26 +22,33 @@ void echo_server()
         std::shared_ptr<tcp::socket> s(new tcp::socket(ios));
         acc.accept(*s);
         go [&session_count, s]{
-            int buflen = 4096;
-            char *buf = new char[buflen];
-            std::unique_ptr<char[]> _ep(buf);
-            error_code ec;
             tcp::endpoint addr = s->remote_endpoint();
             ++session_count;
             printf("connected(%d). %s:%d\n", (int)session_count, addr.address().to_string().c_str(), addr.port());
-            for (;;) {
-                if (ec) {
-                    --session_count;
-                    printf("disconnected(%d). %s:%d\n", (int)session_count, addr.address().to_string().c_str(), addr.port());
-                    return ;
+            co_chan<bool> err;
+
+            go [err, s] {
+                int buflen = 4096;
+                char *buf = new char[buflen];
+                std::unique_ptr<char[]> _ep(buf);
+                error_code ec;
+                int noyield_for_c = 0;
+                for (;;++noyield_for_c) {
+                    auto n = s->read_some(buffer(buf, buflen), ec);
+                    if (ec) break;
+
+                    n = s->write_some(buffer(buf, n), ec);
+                    if (ec) break;
+
+                    if ((noyield_for_c & 0xff) == 0)
+                        yield;
                 }
+                err << true;
+            };
 
-                auto n = s->read_some(buffer(buf, buflen), ec);
-                if (ec) continue;
-
-                n = s->write_some(buffer(buf, n), ec);
-                if (ec) continue;
-            }
+            err >> nullptr;
+            --session_count;
+            printf("disconnected(%d). %s:%d\n", (int)session_count, addr.address().to_string().c_str(), addr.port());
         };
     }
 }
