@@ -182,9 +182,7 @@ TEST(Select, TimeoutIs1)
         EXPECT_EQ(FD_SIZE(&rd_fds), 2);
         uint64_t yield_count = g_Scheduler.GetCurrentTaskYieldCount();
         auto start = std::chrono::high_resolution_clock::now();
-        select_t sfn = (select_t)dlsym((void*)-1, "select");
-        EXPECT_FALSE(sfn == &select);
-        int n = sfn(r->nfds_, &rd_fds, NULL, NULL, gc_new timeval{1, 0});
+        int n = select(r->nfds_, &rd_fds, NULL, NULL, gc_new timeval{1, 0});
         auto end = std::chrono::high_resolution_clock::now();
         auto c = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
         EXPECT_FALSE(*r == rd_fds);
@@ -231,7 +229,7 @@ TEST(Select, MultiThreads)
             EXPECT_TRUE(FD_ISZERO(&rd_fds));
             EXPECT_EQ(n, 0);
             EXPECT_LT(c, 1100);
-            EXPECT_GT(c, 1000);
+            EXPECT_GT(c, 999);
             EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), yield_count + 1);
         };
     boost::thread_group tg;

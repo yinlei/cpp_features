@@ -42,7 +42,7 @@ void foo()
     EXPECT_EQ(errno, EAGAIN);
     EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), yield_count + 1);
     EXPECT_LT(milli, 1100);
-    EXPECT_GT(milli, 1000);
+    EXPECT_GT(milli, 999);
 }
 
 TEST(IOTimed, Main)
