@@ -80,14 +80,13 @@ void show_status()
     }
     printf("%6d  %9llu  %9llu  %7d  %7d    %7d\n",
             (int)session_count, (g_sendbytes - last_sendbytes) / 1024, (g_recvbytes - last_recvbytes) / 1024,
-            (int)(double)(g_recvbytes - last_recvbytes) / qdata,
+            (int)((double)(g_recvbytes - last_recvbytes) / qdata),
             (int)((double)g_recvbytes / qdata / std::max<int>(1, duration_cast<seconds>(now - start_time).count() + 1)),
             (int)duration_cast<milliseconds>(now - last_time).count()
             );
     last_time = now;
     last_sendbytes = g_sendbytes;
     last_recvbytes = g_recvbytes;
-    co_timer_add(seconds(1), show_status);
 }
 
 int main(int argc, char **argv)
@@ -109,12 +108,13 @@ int main(int argc, char **argv)
     for (int i = 0; i < conn_count; ++i)
         go client;
 
-    co_timer_add(seconds(1), show_status);
-
     boost::thread_group tg;
     for (int i = 0; i < thread_count; ++i)
         tg.create_thread([] { g_Scheduler.RunUntilNoTask(); });
-    tg.join_all();
+    for (;;) {
+        sleep(1);
+        show_status();
+    }
     return 0;
 }
 
