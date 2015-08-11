@@ -5,6 +5,9 @@
 #include <mutex>
 #include <limits>
 
+namespace co
+{
+
 BlockObject::BlockObject(std::size_t init_wakeup, std::size_t max_wakeup)
     : wakeup_(init_wakeup), max_wakeup_(max_wakeup)
 {}
@@ -91,3 +94,4 @@ bool BlockObject::AddWaitTask(Task* tk)
     return true;
 }
 
+} //namespace co

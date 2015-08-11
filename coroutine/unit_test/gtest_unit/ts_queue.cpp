@@ -3,6 +3,7 @@
 #include <vector>
 #include <list>
 #include <atomic>
+using namespace co;
 
 struct QueueElem : public TSQueueHook
 {

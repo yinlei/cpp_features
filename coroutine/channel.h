@@ -4,6 +4,9 @@
 #include "co_mutex.h"
 #include <queue>
 
+namespace co
+{
+
 template <typename T>
 class Channel
 {
@@ -160,3 +163,5 @@ private:
     };
 };
 
+
+} //namespace co

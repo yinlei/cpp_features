@@ -9,6 +9,7 @@
 #include <dlfcn.h>
 #include "coroutine.h"
 using namespace std;
+using namespace co;
 
 ///select test points:
 // 1.timeout == 0 seconds (immedaitely)

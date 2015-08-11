@@ -3,6 +3,9 @@
 #include "error.h"
 #include <assert.h>
 
+namespace co
+{
+
 CoMutex::CoMutex()
     : block_(1)
 {
@@ -29,3 +32,5 @@ void CoMutex::unlock()
         ThrowError(eCoErrorCode::ec_mutex_double_unlock);
 }
 
+
+} //namespace co

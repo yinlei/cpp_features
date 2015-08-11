@@ -4,6 +4,7 @@
 #include <vector>
 #include <list>
 #include <atomic>
+using namespace co;
 
 static std::atomic<int> g_value{0};
 

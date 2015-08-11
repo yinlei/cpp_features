@@ -5,13 +5,13 @@
  * 的异常提供以下几种处理方式:
  *   1.立即在协程栈上抛出异常, 此举会导致进程直接崩溃, 但是可以生成带有堆栈的coredump
  *     设置方法：
- *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::immedaitely_throw;
+ *       g_Scheduler.GetOptions().exception_handle = co::eCoExHandle::immedaitely_throw;
  *   2.结束当前协程, 使其堆栈回滚, 将异常暂存至调度器Run时抛出.
  *     设置方法：
- *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::delay_rethrow;
+ *       g_Scheduler.GetOptions().exception_handle = co::eCoExHandle::delay_rethrow;
  *   3.结束当前协程, 吃掉异常, 仅打印一些日志信息.
  *     设置方法：
- *       g_Scheduler.GetOptions().exception_handle = eCoExHandle::debugger_only;
+ *       g_Scheduler.GetOptions().exception_handle = co::eCoExHandle::debugger_only;
  *
  * 显示日志信息需要打开exception相关的调试信息:
  *       g_Scheduler.GetOptions().debug |= dbg_exception;
@@ -25,7 +25,7 @@
 
 int main()
 {
-    g_Scheduler.GetOptions().exception_handle = eCoExHandle::delay_rethrow;
+    g_Scheduler.GetOptions().exception_handle = co::eCoExHandle::delay_rethrow;
     go []{ throw 1; };
     try {
         g_Scheduler.RunUntilNoTask();
@@ -33,8 +33,8 @@ int main()
         printf("caught delay throw exception:%d\n", v);
     }
 
-    g_Scheduler.GetOptions().debug |= dbg_exception;
-    g_Scheduler.GetOptions().exception_handle = eCoExHandle::debugger_only;
+    g_Scheduler.GetOptions().debug |= co::dbg_exception;
+    g_Scheduler.GetOptions().exception_handle = co::eCoExHandle::debugger_only;
     go []{
         // 为了使打印的日志信息更加容易辨识，还可以给当前协程附加一些调试信息。
         g_Scheduler.SetCurrentTaskDebugInfo("throw_ex");

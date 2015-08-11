@@ -2,6 +2,9 @@
 #include "ts_queue.h"
 #include "task.h"
 
+namespace co
+{
+
 class BlockObject
 {
 protected:
@@ -26,3 +29,5 @@ public:
 private:
     bool AddWaitTask(Task* tk);
 };
+
+} //namespace co

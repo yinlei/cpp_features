@@ -6,6 +6,7 @@
 #include <chrono>
 #include "coroutine.h"
 using namespace std;
+using namespace co;
 
 ///poll test points:
 // 1.timeout == 0

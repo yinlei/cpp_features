@@ -23,7 +23,7 @@ void foo()
 
 int main(int argc, char** argv)
 {
-    g_Scheduler.GetOptions().debug = dbg_syncblock;
+    g_Scheduler.GetOptions().debug = co::dbg_syncblock;
     for (int i = 0; i < co_count; ++i)
         go foo;
     cout << "go" << endl;

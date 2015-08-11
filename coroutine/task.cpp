@@ -3,6 +3,9 @@
 #include "scheduler.h"
 #include <string.h>
 
+namespace co
+{
+
 uint64_t Task::s_id = 0;
 std::atomic<uint64_t> Task::s_task_count{0};
 
@@ -148,3 +151,5 @@ RefGuard::~RefGuard()
     tk_->DecrementRef();
 }
 
+
+} //namespace co

@@ -5,6 +5,9 @@
 #include <system_error>
 #include <unistd.h>
 
+namespace co
+{
+
 Scheduler& Scheduler::getInstance()
 {
     static Scheduler obj;
@@ -435,3 +438,4 @@ void Scheduler::ClearWaitPairWithoutLock(int64_t type,
     }
 }
 
+} //namespace co

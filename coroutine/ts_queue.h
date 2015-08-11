@@ -3,6 +3,9 @@
 #include <assert.h>
 #include "spinlock.h"
 
+namespace co
+{
+
 struct fake_lock_guard
 {
     template <typename Mutex>
@@ -172,3 +175,5 @@ public:
     }
 };
 
+
+} //namespace co

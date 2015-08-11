@@ -5,6 +5,7 @@
 #include <list>
 #include <atomic>
 #include <boost/timer.hpp>
+using namespace co;
 
 double second_duration(std::chrono::system_clock::time_point start)
 {

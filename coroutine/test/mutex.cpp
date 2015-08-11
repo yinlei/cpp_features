@@ -20,7 +20,7 @@ void f1()
 
 int main()
 {
-    g_Scheduler.GetOptions().debug = dbg_wait;
+    g_Scheduler.GetOptions().debug = co::dbg_wait;
     g_mutex.try_lock();
     go f1;
     cout << "go" << endl;

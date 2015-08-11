@@ -71,16 +71,19 @@ void show_status()
 {
     static int show_title = 0;
     static long long unsigned last_sendbytes = 0, last_recvbytes = 0;
+    static auto start_time = system_clock::now();
     static auto last_time = system_clock::now();
     auto now = system_clock::now();
     if (show_title++ % 10 == 0) {
         printf("thread:%d, qdata:%d\n", thread_count, qdata);
-        printf("  conn   send(KB)   recv(KB)   qps   time_delta(ms)\n");
+        printf("  conn   send(KB)   recv(KB)     qps   AverageQps  time_delta(ms)\n");
     }
-    printf("%6d %9llu %9llu %7d %6d\n",
+    printf("%6d  %9llu  %9llu  %7d  %7d    %7d\n",
             (int)session_count, (g_sendbytes - last_sendbytes) / 1024, (g_recvbytes - last_recvbytes) / 1024,
             (int)(double)(g_recvbytes - last_recvbytes) / qdata,
-            (int)duration_cast<milliseconds>(now - last_time).count());
+            (int)((double)g_recvbytes / qdata / std::max<int>(1, duration_cast<seconds>(now - start_time).count() + 1)),
+            (int)duration_cast<milliseconds>(now - last_time).count()
+            );
     last_time = now;
     last_sendbytes = g_sendbytes;
     last_recvbytes = g_recvbytes;

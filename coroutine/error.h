@@ -2,6 +2,9 @@
 #include <system_error>
 #include <string>
 
+namespace co
+{
+
 enum class eCoErrorCode : int
 {
     ec_ok = 0,
@@ -26,3 +29,5 @@ const std::error_category& GetCoErrorCategory();
 std::error_code MakeCoErrorCode(eCoErrorCode code);
 
 void ThrowError(eCoErrorCode code);
+
+} //namespace co

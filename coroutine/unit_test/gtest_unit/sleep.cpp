@@ -9,6 +9,7 @@
 #include <time.h>
 #include <poll.h>
 using namespace std;
+using namespace co;
 
 enum class sleep_type
 {

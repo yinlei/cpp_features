@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 using namespace std;
+using namespace co;
 
 void foo()
 {

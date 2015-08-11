@@ -6,6 +6,7 @@
 #include <atomic>
 #include "coroutine.h"
 using namespace std::chrono;
+using namespace co;
 
 #define EXPECT_YIELD(n) EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), n)
 

@@ -1,6 +1,9 @@
 #include "timer.h"
 #include <mutex>
 
+namespace co
+{
+
 std::atomic<uint64_t> CoTimer::s_id{0};
 
 CoTimer::CoTimer(fn_t const& fn)
@@ -115,3 +118,5 @@ CoTimerMgr::TimePoint CoTimerMgr::Now()
     return TimePoint::clock::now();
 }
 
+
+} //namespace co

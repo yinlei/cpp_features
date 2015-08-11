@@ -20,6 +20,9 @@
         } \
     } while(0)
 
+namespace co
+{
+
 ///---- debugger flags
 static const uint64_t dbg_none = 0;
 static const uint64_t dbg_all = 0xffffffffffffffffULL;
@@ -251,7 +254,9 @@ class Scheduler
     friend class SleepWait;
 };
 
-#define g_Scheduler Scheduler::getInstance()
-
 #include "scheduler-inl.h"
+
+} //namespace co
+
+#define g_Scheduler ::co::Scheduler::getInstance()
 

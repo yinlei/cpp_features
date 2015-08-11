@@ -6,6 +6,7 @@
 #include "test_server.h"
 #include "coroutine.h"
 using namespace std;
+using namespace co;
 
 void foo()
 {

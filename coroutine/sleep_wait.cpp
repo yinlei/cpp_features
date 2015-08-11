@@ -3,6 +3,9 @@
 #include <chrono>
 #include <assert.h>
 
+namespace co
+{
+
 void SleepWait::CoSwitch(int timeout_ms)
 {
     Task *tk = g_Scheduler.GetCurrentTask();
@@ -47,3 +50,5 @@ void SleepWait::Wakeup(Task* tk)
     g_Scheduler.AddTaskRunnable(tk);
 }
 
+
+} //namespace co

@@ -8,6 +8,9 @@
 #include "ts_queue.h"
 #include "timer.h"
 
+namespace co
+{
+
 enum class TaskState
 {
     runnable,
@@ -106,3 +109,5 @@ private:
     Task *tk_;
 };
 
+
+} //namespace co

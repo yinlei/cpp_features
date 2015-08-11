@@ -5,9 +5,10 @@
 #include <sys/socket.h>
 #include "scheduler.h"
 #include <assert.h>
+using namespace co;
 
 template <typename OriginF, typename ... Args>
-ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
+static ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
 {
     Task* tk = g_Scheduler.GetCurrentTask();
     DebugPrint(dbg_hook, "task(%s) hook %s. %s coroutine.",
@@ -482,6 +483,9 @@ extern int __nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
 }
 
+namespace co
+{
+
 void coroutine_hook_init()
 {
 #if defined(CO_DYNAMIC_LINK)
@@ -526,3 +530,4 @@ void coroutine_hook_init()
     }
 }
 
+} //namespace co

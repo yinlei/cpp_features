@@ -6,6 +6,9 @@
 #include <list>
 #include "task.h"
 
+namespace co
+{
+
 class SleepWait
 {
 public:
@@ -26,3 +29,5 @@ private:
     TaskList wait_tasks_;
 };
 
+
+} //namespace co

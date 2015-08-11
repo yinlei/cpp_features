@@ -7,6 +7,9 @@
 #include <list>
 #include "spinlock.h"
 
+namespace co
+{
+
 class CoTimer
 {
 public:
@@ -66,3 +69,5 @@ private:
     LFLock lock_;
 };
 
+
+} //namespace co

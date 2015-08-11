@@ -2,6 +2,9 @@
 #include <sys/poll.h>
 #include "scheduler.h"
 
+namespace co
+{
+
 enum class EpollType
 {
     read,
@@ -218,3 +221,5 @@ int IoWait::ChooseEpoll(uint32_t event)
 {
     return (event & EPOLLIN) ? epoll_fds_[(int)EpollType::read] : epoll_fds_[(int)EpollType::write];
 }
+
+} //namespace co

@@ -1,6 +1,9 @@
 #include "error.h"
 #include "scheduler.h"
 
+namespace co
+{
+
 const char* co_error_category::name() const noexcept
 {
     return "coroutine_error";
@@ -48,3 +51,4 @@ void ThrowError(eCoErrorCode code)
     throw std::system_error(MakeCoErrorCode(code));
 }
 
+} //namespace co

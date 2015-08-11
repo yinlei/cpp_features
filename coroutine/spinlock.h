@@ -1,6 +1,9 @@
 #pragma once
 #include <atomic>
 
+namespace co
+{
+
 struct LFLock
 {
     volatile std::atomic_flag lck = ATOMIC_FLAG_INIT;
@@ -21,3 +24,5 @@ struct LFLock
     }
 };
 
+
+} //namespace co

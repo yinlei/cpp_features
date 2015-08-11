@@ -77,6 +77,9 @@ runnable *          v
 #include <set>
 #include "task.h"
 
+namespace co
+{
+
 class IoWait
 {
 public:
@@ -116,3 +119,5 @@ private:
     TaskList wait_tasks_;
 };
 
+
+} //namespace co
