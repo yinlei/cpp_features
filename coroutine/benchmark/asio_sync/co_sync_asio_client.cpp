@@ -93,10 +93,10 @@ int main(int argc, char **argv)
 {
     if (argc > 1) 
         if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-            printf("Usage: %s [ThreadCount] [Connection_Count] [QueryDataLength]\n", argv[0]);
-            printf("Default: %s 1 1024 4096\n", argv[0]);
-            printf("For example:\n    %s 2 1000 32\n", argv[0]);
-            printf("It means: start client with 2 threads, create 1000 tcp connection to server, and per data-package is 32 bytes.\n");
+            printf("\n    Usage: %s [ThreadCount] [Connection_Count] [QueryDataLength]\n", argv[0]);
+            printf("\n    Default: %s 1 1024 4096\n", argv[0]);
+            printf("\n    For example:\n        %s 2 1000 32\n", argv[0]);
+            printf("\n    That's means: start client with 2 threads, create 1000 tcp connection to server, and per data-package is 32 bytes.\n\n");
             exit(1);
         }
 
