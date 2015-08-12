@@ -105,7 +105,7 @@ int main(int argc, char **argv)
     if (argc > 3)
         qdata = atoi(argv[3]);
 
-    rlimit of = {8192, 8192};
+    rlimit of = {65536, 65536};
     if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {
         perror("setrlimit");
         exit(1);

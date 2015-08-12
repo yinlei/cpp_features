@@ -17,6 +17,9 @@ int thread_count = 1;
 void client()
 {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd < 0) {
+        perror("socket create error:");
+    }
     assert(sock_fd >= 0);
 
     sockaddr_in addr;
@@ -99,7 +102,7 @@ int main(int argc, char **argv)
     if (argc > 3)
         qdata = atoi(argv[3]);
 
-    rlimit of = {8192, 8192};
+    rlimit of = {65536, 65536};
     if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {
         perror("setrlimit");
         exit(1);
