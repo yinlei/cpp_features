@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -g -Wall
+CFLAGS=-std=c++11 -O3 -Wall
 INCLUDE=
 LINK=-lboost_thread -lboost_system -lpthread
 STATIC=-static -static-libgcc -static-libstdc++
