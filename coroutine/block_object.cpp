@@ -67,7 +67,7 @@ bool BlockObject::Wakeup()
         }
 
         ++wakeup_;
-        DebugPrint(dbg_syncblock, "wakeup to %u.", wakeup_);
+        DebugPrint(dbg_syncblock, "wakeup to %lu.", (long unsigned)wakeup_);
         return true;
     }
 
