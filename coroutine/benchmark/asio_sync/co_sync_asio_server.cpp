@@ -11,11 +11,15 @@ using boost::system::error_code;
 // io_service的生命期要长于socket
 io_service ios;
 tcp::endpoint addr(address::from_string("127.0.0.1"), 43333);
+int thread_count = 1;
+int qdata = 4096;
 
 void echo_server()
 {
     tcp::acceptor acc(ios, addr, true);
-    printf("startup server, listen %s:%d\n", acc.local_endpoint().address().to_string().c_str(),
+    printf("Corotine-asio server startup, thread:%d, qdata:%d, listen %s:%d\n",
+            thread_count, qdata,
+            acc.local_endpoint().address().to_string().c_str(),
             acc.local_endpoint().port());
     std::atomic<int> session_count{0};
     for (;;) {
@@ -37,11 +41,19 @@ void echo_server()
                     auto n = s->read_some(buffer(buf, buflen), ec);
                     if (ec) break;
 
-                    n = s->write_some(buffer(buf, n), ec);
+                    size_t begin = 0;
+goon_write:
+                    size_t rn = s->write_some(buffer(buf + begin, std::min<int>(n, qdata)), ec);
                     if (ec) break;
-
+                    n -= rn;
+                    begin += rn;
                     if ((noyield_for_c & 0xff) == 0)
                         yield;
+
+                    if (n > 0) {
+                        ++noyield_for_c;
+                        goto goon_write;
+                    }
                 }
                 err << true;
             };
@@ -55,9 +67,10 @@ void echo_server()
 
 int main(int argc, char **argv)
 {
-    int thread_count = 1;
     if (argc > 1)
         thread_count = atoi(argv[1]);
+    if (argc > 2)
+        qdata = atoi(argv[2]);
 
     rlimit of = {65536, 65536};
     if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {

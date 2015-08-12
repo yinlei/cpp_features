@@ -8,6 +8,7 @@
 static const char* g_ip = "127.0.0.1";
 static const uint16_t g_port = 43333;
 int thread_count = 1;
+int qdata = 4096;
 
 void echo_server()
 {
@@ -29,7 +30,8 @@ void echo_server()
     ret = listen(accept_fd, 100);
     assert(ret == 0);
 
-    printf("Coroutine server startup, thread:%d, listen %s:%d\n", thread_count, g_ip, g_port);
+    printf("Coroutine server startup, thread:%d, qdata:%d, listen %s:%d\n",
+            thread_count, qdata, g_ip, g_port);
     std::atomic<int> session_count{0};
     for (;;) {
         socklen_t addr_len = sizeof(addr);
@@ -54,11 +56,19 @@ void echo_server()
                     auto n = read(sock_fd, buf, buflen);
                     if (n <= 0) break;
 
-                    n = write(sock_fd, buf, n);
-                    if (n <= 0) break;
-
+                    size_t begin = 0;
+goon_write:
+                    ssize_t rn = write(sock_fd, buf + begin, std::min<int>(n, qdata));
+                    if (rn <= 0) break;
+                    n -= rn;
+                    begin += rn;
                     if ((noyield_for_c & 0xff) == 0)
                         yield;
+
+                    if (n > 0) {
+                        ++noyield_for_c;
+                        goto goon_write;
+                    }
                 }
                 err << true;
             };
@@ -74,6 +84,8 @@ int main(int argc, char **argv)
 {
     if (argc > 1)
         thread_count = atoi(argv[1]);
+    if (argc > 2)
+        qdata = atoi(argv[2]);
 
     rlimit of = {65536, 65536};
     if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {

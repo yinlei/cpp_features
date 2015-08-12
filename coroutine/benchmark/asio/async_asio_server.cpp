@@ -14,23 +14,29 @@ io_service ios;
 tcp::endpoint addr(address::from_string("127.0.0.1"), 43333);
 std::atomic<int> g_conn{0};
 const int g_buflen = 4096;
+int thread_count = 1;
+int qdata = 4096;
 
-void on_err(shared_ptr<tcp::socket> s, char* buf)
+void on_err(shared_ptr<tcp::socket>, char* buf)
 {
     delete buf;
     printf("disconnected(%d).\n", --g_conn);
 }
 
 void async_read(shared_ptr<tcp::socket> s, char* buf);
-void async_write(shared_ptr<tcp::socket> s, char* buf, size_t bytes)
+void async_write(shared_ptr<tcp::socket> s, char* buf, size_t begin, size_t bytes)
 {
-    s->async_write_some(buffer(buf, bytes), [s, buf](error_code const& ec, size_t n) {
+    s->async_write_some(buffer(buf + begin, std::min<int>(qdata, bytes)), [=](error_code const& ec, size_t n)mutable {
                 if (ec) {
                     on_err(s, buf);
                     return ;
                 }
 
-                async_read(s, buf);
+                bytes -= n;
+                if (bytes > 0)
+                    ::async_write(s, buf, begin + n, bytes);
+                else 
+                    ::async_read(s, buf);
             });
 }
 
@@ -42,7 +48,7 @@ void async_read(shared_ptr<tcp::socket> s, char* buf)
                     return ;
                 }
 
-                async_write(s, buf, n);
+                ::async_write(s, buf, 0, n);
             });
 }
 
@@ -73,9 +79,10 @@ void echo_server()
 
 int main(int argc, char **argv)
 {
-    int thread_count = 1;
     if (argc > 1)
         thread_count = atoi(argv[1]);
+    if (argc > 2)
+        qdata = atoi(argv[2]);
 
     rlimit of = {65536, 65536};
     if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {
@@ -83,8 +90,8 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    printf("startup server, thread:%d, listen %s:%d\n", thread_count,
-            addr.address().to_string().c_str(), addr.port());
+    printf("startup server, thread:%d, qdata:%d, listen %s:%d\n", thread_count,
+            qdata, addr.address().to_string().c_str(), addr.port());
 
     echo_server();
 
