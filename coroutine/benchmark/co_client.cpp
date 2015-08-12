@@ -9,7 +9,7 @@ using namespace std::chrono;
 static const char* g_ip = "127.0.0.1";
 static const uint16_t g_port = 43333;
 
-std::atomic<long long unsigned> g_sendbytes{0}, g_recvbytes{0};
+std::atomic<long unsigned> g_sendbytes{0}, g_recvbytes{0};
 std::atomic<int> session_count{0};
 uint32_t qdata = 4;
 int thread_count = 4;
@@ -73,7 +73,7 @@ void client()
 void show_status()
 {
     static int show_title = 0;
-    static long long unsigned last_sendbytes = 0, last_recvbytes = 0;
+    static long unsigned last_sendbytes = 0, last_recvbytes = 0;
     static auto start_time = system_clock::now();
     static auto last_time = system_clock::now();
     auto now = system_clock::now();
@@ -81,7 +81,7 @@ void show_status()
         printf("thread:%d, qdata:%d\n", thread_count, qdata);
         printf("  conn   send(KB)   recv(KB)     qps   AverageQps  time_delta(ms)\n");
     }
-    printf("%6d  %9llu  %9llu  %7d  %7d    %7d\n",
+    printf("%6d  %9lu  %9lu  %7d  %7d    %7d\n",
             (int)session_count, (g_sendbytes - last_sendbytes) / 1024, (g_recvbytes - last_recvbytes) / 1024,
             (int)((double)(g_recvbytes - last_recvbytes) / qdata),
             (int)((double)g_recvbytes / qdata / std::max<int>(1, duration_cast<seconds>(now - start_time).count() + 1)),
