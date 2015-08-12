@@ -13,7 +13,7 @@ using std::shared_ptr;
 // 由于socket的析构要依赖于io_service, 所以注意控制
 // io_service的生命期要长于socket
 io_service ios;
-tcp::endpoint addr(address::from_string("127.0.0.1"), 43334);
+tcp::endpoint addr(address::from_string("127.0.0.1"), 43333);
 const int g_buflen = 4096;
 
 std::atomic<long long unsigned> g_sendbytes{0}, g_recvbytes{0}, g_qps{0};
