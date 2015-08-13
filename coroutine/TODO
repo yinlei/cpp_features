@@ -1,4 +1,5 @@
 TODO:
+HOOK read write时, 不要影响读文件
 尝试HOOK socket函数族其他可能阻塞的函数，比如getaddrbyname
 考虑移植Windows: 1.HOOK WINAPI, boost.asio替代epoll 2.ucontext->boost.context
 
