@@ -182,12 +182,14 @@ TEST(Poll, MultiThreads)
             EXPECT_EQ(n, 0);
             EXPECT_EQ(g_Scheduler.GetCurrentTaskYieldCount(), yield_count + 1);
         };
+    printf("coroutines create done.\n");
     boost::thread_group tg;
     for (int i = 0; i < 8; ++i)
         tg.create_thread([] {
                 g_Scheduler.RunUntilNoTask();
                 });
     tg.join_all();
+    printf("coroutines run done.\n");
     EXPECT_EQ(Task::GetTaskCount(), Task::GetDeletedTaskCount());
     if (Task::GetTaskCount()) // 可能会有一些Task还未删除，执行删除逻辑。
         g_Scheduler.RunUntilNoTask();

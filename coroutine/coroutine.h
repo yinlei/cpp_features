@@ -51,6 +51,9 @@ inline bool co_timer_block_cancel(TimerId timer_id) {
 // coroutine sleep, never blocks current thread.
 #define co_sleep(milliseconds) do { g_Scheduler.SleepSwitch(milliseconds); } while (0)
 
+// co_sched
+#define co_sched g_Scheduler
+
 // co_mutex
 using ::co::co_mutex;
 

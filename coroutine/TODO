@@ -1,5 +1,5 @@
 TODO:
-HOOK read write时, 不要影响读文件
+HOOK select poll时, 正确处理文件句柄
 尝试HOOK socket函数族其他可能阻塞的函数，比如getaddrbyname
 考虑移植Windows: 1.HOOK WINAPI, boost.asio替代epoll 2.ucontext->boost.context
 
@@ -18,3 +18,4 @@ DONE:
 支持select 
 支持channel特性
 添加命名空间
+HOOK read write时, 不要影响读文件

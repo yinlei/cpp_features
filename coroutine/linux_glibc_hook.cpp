@@ -3,8 +3,9 @@
 #include <poll.h>
 #include <sys/epoll.h>
 #include <sys/socket.h>
-#include "scheduler.h"
+#include <sys/stat.h>
 #include <assert.h>
+#include "scheduler.h"
 using namespace co;
 
 namespace co {
@@ -21,8 +22,15 @@ static ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uin
     if (!tk)
         return fn(fd, std::forward<Args>(args)...);
 
+    struct stat fd_stat;
+    if (-1 == fstat(fd, &fd_stat))
+        return fn(fd, std::forward<Args>(args)...);
+
+    if (!S_ISSOCK(fd_stat.st_mode)) // 不是socket, 不HOOK.
+        return fn(fd, std::forward<Args>(args)...);
+
     int flags = fcntl(fd, F_GETFL, 0);
-    if (flags & O_NONBLOCK)
+    if (-1 == flags || (flags & O_NONBLOCK))
         return fn(fd, std::forward<Args>(args)...);
 
     if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
