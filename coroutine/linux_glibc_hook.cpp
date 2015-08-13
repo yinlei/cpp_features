@@ -7,6 +7,10 @@
 #include <assert.h>
 using namespace co;
 
+namespace co {
+    void coroutine_hook_init();
+}
+
 template <typename OriginF, typename ... Args>
 static ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uint32_t event, int timeout_so, Args && ... args)
 {
@@ -190,60 +194,71 @@ int connect(int fd, const struct sockaddr *addr, socklen_t addrlen)
 
 int accept(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 {
+    if (!accept_f) coroutine_hook_init();
     return read_write_mode(sockfd, accept_f, "accept", EPOLLIN, SO_RCVTIMEO, addr, addrlen);
 }
 
 ssize_t read(int fd, void *buf, size_t count)
 {
+    if (!read_f) coroutine_hook_init();
     return read_write_mode(fd, read_f, "read", EPOLLIN, SO_RCVTIMEO, buf, count);
 }
 
 ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 {
+    if (!readv_f) coroutine_hook_init();
     return read_write_mode(fd, readv_f, "readv", EPOLLIN, SO_RCVTIMEO, iov, iovcnt);
 }
 
 ssize_t recv(int sockfd, void *buf, size_t len, int flags)
 {
+    if (!recv_f) coroutine_hook_init();
     return read_write_mode(sockfd, recv_f, "recv", EPOLLIN, SO_RCVTIMEO, buf, len, flags);
 }
 
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags,
         struct sockaddr *src_addr, socklen_t *addrlen)
 {
+    if (!recvfrom_f) coroutine_hook_init();
     return read_write_mode(sockfd, recvfrom_f, "recvfrom", EPOLLIN, SO_RCVTIMEO, buf, len, flags,
             src_addr, addrlen);
 }
 
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags)
 {
+    if (!recvmsg_f) coroutine_hook_init();
     return read_write_mode(sockfd, recvmsg_f, "recvmsg", EPOLLIN, SO_RCVTIMEO, msg, flags);
 }
 
 ssize_t write(int fd, const void *buf, size_t count)
 {
+    if (!write_f) coroutine_hook_init();
     return read_write_mode(fd, write_f, "write", EPOLLOUT, SO_SNDTIMEO, buf, count);
 }
 
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
+    if (!writev_f) coroutine_hook_init();
     return read_write_mode(fd, writev_f, "writev", EPOLLOUT, SO_SNDTIMEO, iov, iovcnt);
 }
 
 ssize_t send(int sockfd, const void *buf, size_t len, int flags)
 {
+    if (!send_f) coroutine_hook_init();
     return read_write_mode(sockfd, send_f, "send", EPOLLOUT, SO_SNDTIMEO, buf, len, flags);
 }
 
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags,
         const struct sockaddr *dest_addr, socklen_t addrlen)
 {
+    if (!sendto_f) coroutine_hook_init();
     return read_write_mode(sockfd, sendto_f, "sendto", EPOLLOUT, SO_SNDTIMEO, buf, len, flags,
             dest_addr, addrlen);
 }
 
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags)
 {
+    if (!sendmsg_f) coroutine_hook_init();
     return read_write_mode(sockfd, sendmsg_f, "sendmsg", EPOLLOUT, SO_SNDTIMEO, msg, flags);
 }
 
@@ -269,6 +284,8 @@ static short EpollEvent2Poll(uint32_t events)
 
 int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 {
+    if (!poll_f) coroutine_hook_init();
+
     Task* tk = g_Scheduler.GetCurrentTask();
     DebugPrint(dbg_hook, "task(%s) hook poll(nfds=%d, timeout=%d). %s coroutine.",
             tk ? tk->DebugInfo() : "nil",
@@ -333,6 +350,8 @@ int poll(struct pollfd *fds, nfds_t nfds, int timeout)
 int select(int nfds, fd_set *readfds, fd_set *writefds,
         fd_set *exceptfds, struct timeval *timeout)
 {
+    if (!select_f) coroutine_hook_init();
+
     int timeout_ms = -1;
     if (timeout)
         timeout_ms = timeout->tv_sec * 1000 + timeout->tv_usec / 1000;
@@ -432,6 +451,8 @@ int select(int nfds, fd_set *readfds, fd_set *writefds,
 
 unsigned int sleep(unsigned int seconds)
 {
+    if (!sleep_f) coroutine_hook_init();
+
     Task* tk = g_Scheduler.GetCurrentTask();
     DebugPrint(dbg_hook, "task(%s) hook sleep(seconds=%u). %s coroutine.",
             tk ? tk->DebugInfo() : "nil", seconds,
@@ -447,6 +468,8 @@ unsigned int sleep(unsigned int seconds)
 
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
+    if (!nanosleep_f) coroutine_hook_init();
+
     Task* tk = g_Scheduler.GetCurrentTask();
     int timeout_ms = req->tv_sec * 1000 + req->tv_nsec / 1000000;
     DebugPrint(dbg_hook, "task(%s) hook nanosleep(milliseconds=%d). %s coroutine.",
@@ -488,6 +511,9 @@ namespace co
 
 void coroutine_hook_init()
 {
+    static bool coroutine_hook_inited = false;
+    if (coroutine_hook_inited) return ;
+
 #if defined(CO_DYNAMIC_LINK)
     connect_f = (connect_t)dlsym(RTLD_NEXT, "connect");
     read_f = (read_t)dlsym(RTLD_NEXT, "read");
@@ -524,10 +550,14 @@ void coroutine_hook_init()
     nanosleep_f = &__nanosleep;
 #endif
 
-    if (!connect_f || !read_f || !write_f || !readv_f || !writev_f) {
+    if (!connect_f || !read_f || !write_f || !readv_f || !writev_f || !send_f
+            || !sendto_f || !sendmsg_f || !accept_f || !poll_f || !select_f
+            || !sleep_f || !nanosleep_f) {
         fprintf(stderr, "Hook syscall failed. Please don't remove libc.a when static-link.\n");
         exit(1);
     }
+
+    coroutine_hook_inited = true;
 }
 
 } //namespace co
