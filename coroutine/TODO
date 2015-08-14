@@ -1,7 +1,7 @@
 TODO:
 设计第二套协程调度方案shared-stack, 以支持创建数以百万计的协程
     1.预研ucontext能否在创建后改变栈指针
-    2.创建多个共享栈, 每个共享栈绑定一批协程?
+    2.创建多个共享栈, 每个共享栈P 绑定一批协程, 每次Run的时候++全局runid, P保存每次被run时的run_id, 小于当前runid的P才需要run.
 HOOK select poll时, 正确处理文件句柄
 尝试HOOK socket函数族其他可能阻塞的函数，比如getaddrbyname
 考虑移植Windows: 1.HOOK WINAPI, boost.asio替代epoll 2.ucontext->boost.context
