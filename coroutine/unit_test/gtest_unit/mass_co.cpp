@@ -48,14 +48,14 @@ TEST_P(MassCo, CnK)
     co_sched.RunUntilNoTask();
     EXPECT_TRUE(co_sched.IsEmpty());
 
-    printf("press anykey to continue. task_c=%u\n", (uint32_t)co::Task::GetTaskCount());
-    getchar();
+//    printf("press anykey to continue. task_c=%u\n", (uint32_t)co::Task::GetTaskCount());
+//    getchar();
 //    co_sched.GetOptions().debug = dbg_none;
 
     co_sched.RunUntilNoTask();
     EXPECT_EQ(co::Task::GetTaskCount(), 0);
-    printf("press anykey to continue. task_c=%u\n", (uint32_t)co::Task::GetTaskCount());
-    getchar();
+//    printf("press anykey to continue. task_c=%u\n", (uint32_t)co::Task::GetTaskCount());
+//    getchar();
 }
 
 INSTANTIATE_TEST_CASE_P(
