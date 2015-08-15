@@ -43,16 +43,17 @@ void Processer::AddTaskRunnable(Task *tk)
 uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
 {
     info.current_task = NULL;
-
-    uint32_t do_count = runnable_list_.size();;
     done_count = 0;
+    uint32_t c = 0;
+    SList<Task> slist = runnable_list_.pop_all();
+    uint32_t do_count = slist.size();
 
     DebugPrint(dbg_scheduler, "Run [Proc(%d) do_count:%u] --------------------------", id_, do_count);
 
-    uint32_t c = 0;
-    for (; c < do_count; ++c)
+    SList<Task>::iterator it = slist.begin();
+    for (; it != slist.end(); ++c)
     {
-        Task* tk = runnable_list_.pop();
+        Task* tk = &*it;
         info.current_task = tk;
         tk->state_ = TaskState::runnable;
         DebugPrint(dbg_switch, "enter task(%s)", tk->DebugInfo());
@@ -68,14 +69,16 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
 
         switch (tk->state_) {
             case TaskState::runnable:
-                runnable_list_.push(tk);
+                ++it;
                 break;
 
             case TaskState::io_block:
+                it = slist.erase(it);
                 g_Scheduler.io_wait_.SchedulerSwitch(tk);
                 break;
 
             case TaskState::sleep:
+                it = slist.erase(it);
                 g_Scheduler.sleep_wait_.SchedulerSwitch(tk);
                 break;
 
@@ -83,6 +86,7 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
             case TaskState::user_block:
                 {
                     if (tk->block_) {
+                        it = slist.erase(it);
                         if (!tk->block_->AddWaitTask(tk))
                             runnable_list_.push(tk);
                         tk->block_ = NULL;
@@ -94,7 +98,9 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
                         if (wait_pair.first) {
                             --wait_pair.first;
                             tk->state_ = TaskState::runnable;
+                            ++it;
                         } else {
+                            it = slist.erase(it);
                             task_queue.push(tk);
                         }
                         g_Scheduler.ClearWaitPairWithoutLock(tk->user_wait_type_,
@@ -107,9 +113,11 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
             default:
                 --task_count_;
                 ++done_count;
+                it = slist.erase(it);
                 DebugPrint(dbg_task, "task(%s) done.", tk->DebugInfo());
                 if (tk->eptr_) {
                     std::exception_ptr ep = tk->eptr_;
+                    runnable_list_.push(slist);
                     tk->DecrementRef();
                     std::rethrow_exception(ep);
                 } else
@@ -117,6 +125,8 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
                 break;
         }
     }
+    if (do_count)
+        runnable_list_.push(slist);
 
     return c;
 }

@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -g -Wall -fPIC
+CFLAGS=-std=c++11 -g -O3 -Wall -fPIC
 STATIC_LIB=libcoroutine.a
 DYNAMIC_LIB=libcoroutine.so
 OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))

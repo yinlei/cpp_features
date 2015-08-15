@@ -158,6 +158,7 @@ public:
         tail_ = elements.tail();
     }
 
+    // O(n), 慎用.
     SList<T> pop(uint32_t n)
     {
         if (head_ == tail_) return SList<T>();
@@ -175,6 +176,22 @@ public:
         count_ -= c;
         return SList<T>(first, last, c, this);
     }
+
+    SList<T> pop_all()
+    {
+        if (head_ == tail_) return SList<T>();
+        LockGuard lock(lck);
+        if (head_ == tail_) return SList<T>();
+        TSQueueHook* first = head_->next;
+        TSQueueHook* last = tail_;
+        tail_ = head_;
+        head_->next = NULL;
+        first->prev = last->next = NULL;
+        std::size_t c = count_;
+        count_ = 0;
+        return SList<T>(first, last, c, this);
+    }
+
 
     bool erase(TSQueueHook* hook)
     {
