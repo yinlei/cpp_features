@@ -90,7 +90,7 @@ TEST_P(Sleep, sleep1)
     auto dc = chrono::duration_cast<chrono::milliseconds>(e - s).count();
     EXPECT_EQ(c, n);
     EXPECT_LT(dc, 1100);
-    EXPECT_GT(dc, 1000);
+    EXPECT_GT(dc, 999);
 }
 
 INSTANTIATE_TEST_CASE_P(

@@ -11,11 +11,12 @@
 #include "timer.h"
 #include "io_wait.h"
 #include "sleep_wait.h"
+#include "processer.h"
 
 #define DebugPrint(type, fmt, ...) \
     do { \
         if (g_Scheduler.GetOptions().debug & type) { \
-            fprintf(g_Scheduler.GetOptions().debug_output, "co_dbg[0x%04d] ---- " fmt "\n", \
+            fprintf(g_Scheduler.GetOptions().debug_output, "co_dbg[%04d] " fmt "\n", \
                     g_Scheduler.GetCurrentThreadID(), ##__VA_ARGS__); \
         } \
     } while(0)
@@ -24,20 +25,20 @@ namespace co
 {
 
 ///---- debugger flags
-static const uint64_t dbg_none = 0;
-static const uint64_t dbg_all = 0xffffffffffffffffULL;
-static const uint64_t dbg_hook = 0x1;
-static const uint64_t dbg_yield = 0x1 << 1;
-static const uint64_t dbg_scheduler = 0x1 << 2;
-static const uint64_t dbg_task = 0x1 << 3;
-static const uint64_t dbg_switch = 0x1 << 4;
-static const uint64_t dbg_ioblock = 0x1 << 5;
-static const uint64_t dbg_wait = 0x1 << 6;
-static const uint64_t dbg_exception = 0x1 << 7;
-static const uint64_t dbg_syncblock = 0x1 << 8;
-static const uint64_t dbg_timer = 0x1 << 9;
-static const uint64_t dbg_scheduler_sleep = 0x1 << 10;
-static const uint64_t dbg_sleepblock = 0x1 << 11;
+static const uint64_t dbg_none              = 0;
+static const uint64_t dbg_all               = ~(uint64_t)0;
+static const uint64_t dbg_hook              = 0x1;
+static const uint64_t dbg_yield             = 0x1 << 1;
+static const uint64_t dbg_scheduler         = 0x1 << 2;
+static const uint64_t dbg_task              = 0x1 << 3;
+static const uint64_t dbg_switch            = 0x1 << 4;
+static const uint64_t dbg_ioblock           = 0x1 << 5;
+static const uint64_t dbg_wait              = 0x1 << 6;
+static const uint64_t dbg_exception         = 0x1 << 7;
+static const uint64_t dbg_syncblock         = 0x1 << 8;
+static const uint64_t dbg_timer             = 0x1 << 9;
+static const uint64_t dbg_scheduler_sleep   = 0x1 << 10;
+static const uint64_t dbg_sleepblock        = 0x1 << 11;
 ///-------------------
 
 // 协程中抛出未捕获异常时的处理方式
@@ -60,14 +61,18 @@ struct CoroutineOptions
     // 协程中抛出未捕获异常时的处理方式
     eCoExHandle exception_handle = eCoExHandle::immedaitely_throw;
 
-    // 协程栈大小, 只会影响在此值设置之后新创建的协程.
-    uint32_t stack_size = 128 * 1024; 
+    // 协程栈大小上限, 只会影响在此值设置之后新创建的P, 建议在首次Run前设置.
+    uint32_t stack_size = 2 * 1024 * 1024; 
 
-    // Run每次最多从run队列中pop出1/chunk_count * task_count个task.
-    uint32_t chunk_count = 128;     
+    // 初始协程栈大小, 此值越小, 对内存消耗越少, 但不会低于16bytes.
+    //    设置一个恰当的初始栈大小, 可以避免栈内存重分配, 提高性能, 但可能会浪费一部分内存.
+    //    这个值只是用来保存栈内存的内存块初始大小, 即使设置的很大, 栈大小也不会超过stack_size
+    uint32_t init_stack_size = 512; 
 
-    // Run每次最多从run队列中pop出max_chunk_size个task.
-    uint32_t max_chunk_size = 128;  
+    // P的数量, 首次Run时创建所有P, 随后只能增加新的P不能减少现有的P
+    //    此值越大, 并行效果越好, 但是相应的每次Run时的消耗很会增加, 同时会占用大量内存.
+    //    建议设置为Run线程数的两倍或四倍.
+    uint32_t processer_count = 16;
 
     // 没有协程需要调度时, Run最多休眠的毫秒数
     uint8_t max_sleep_ms = 20;
@@ -85,6 +90,7 @@ class Scheduler
 {
     public:
         typedef TSQueue<Task> TaskList;  // 线程安全的协程队列
+        typedef TSQueue<Processer> ProcList;
         typedef std::pair<uint32_t, TSQueue<Task, false>> WaitPair;
         typedef std::unordered_map<uint64_t, WaitPair> WaitZone;
         typedef std::unordered_map<int64_t, WaitZone> WaitTable;
@@ -118,10 +124,7 @@ class Scheduler
         // 当前协程总数量
         uint32_t TaskCount();
 
-        // 当前处于可执行状态的协程总数量
-        uint32_t RunnableTaskCount();
-
-        // 当前协程ID, ID从1开始（不再协程中则返回0）
+        // 当前协程ID, ID从1开始（不在协程中则返回0）
         uint64_t GetCurrentTaskID();
 
         // 当前协程切换的次数
@@ -204,7 +207,7 @@ class Scheduler
 
         // 唤醒对某个时间等待的协程.
         uint32_t BlockWakeup(int64_t type, uint64_t wait_id, uint32_t wakeup_count = 1);
-        // }@
+        // @
         /// ------------------------------------------------------------------------
 
         // 清理没有等待也没有被等待的WaitPair.
@@ -226,6 +229,12 @@ class Scheduler
         // 获取线程局部信息
         ThreadLocalInfo& GetLocalInfo();
 
+        // List of Processer
+        LFLock proc_init_lock_;
+        uint32_t proc_count = 0;
+        ProcList run_proc_list_;
+        ProcList wait_proc_list_;
+
         // List of task.
         TaskList run_tasks_;
 
@@ -242,16 +251,15 @@ class Scheduler
         // Timer manager.
         CoTimerMgr timer_mgr_;
 
-        // total task.
-        std::atomic<uint32_t> task_count_;
-        std::atomic<uint32_t> runnable_task_count_;
-        std::atomic<uint8_t> sleep_ms_;
-        std::atomic<uint32_t> thread_id_;
+        std::atomic<uint32_t> task_count_{0};
+        std::atomic<uint8_t> sleep_ms_{0};
+        std::atomic<uint32_t> thread_id_{0};
 
     friend class CoMutex;
     friend class BlockObject;
     friend class IoWait;
     friend class SleepWait;
+    friend class Processer;
 };
 
 #include "scheduler-inl.h"

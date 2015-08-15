@@ -8,7 +8,7 @@ namespace co
 class BlockObject
 {
 protected:
-    friend class Scheduler;
+    friend class Processer;
     std::size_t wakeup_;
     std::size_t max_wakeup_;
     TSQueue<Task, false> wait_queue_;

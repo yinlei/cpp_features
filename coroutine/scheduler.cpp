@@ -16,7 +16,6 @@ Scheduler& Scheduler::getInstance()
 
 extern void coroutine_hook_init();
 Scheduler::Scheduler()
-    : sleep_ms_{1}
 {
     coroutine_hook_init();
 }
@@ -39,15 +38,7 @@ CoroutineOptions& Scheduler::GetOptions()
 
 void Scheduler::CreateTask(TaskF const& fn)
 {
-    Task* tk = new Task(fn, GetOptions().stack_size);
-    if (tk->state_ == TaskState::fatal) {
-        // 创建失败
-        assert(false);
-        delete tk;
-        throw std::system_error(errno, std::system_category());
-        return ;
-    }
-
+    Task* tk = new Task(fn);
     ++task_count_;
     DebugPrint(dbg_task, "task(%s) created.", tk->DebugInfo());
     AddTaskRunnable(tk);
@@ -67,19 +58,32 @@ void Scheduler::Yield()
 {
     Task* tk = GetLocalInfo().current_task;
     if (!tk) return ;
-
-    DebugPrint(dbg_yield, "yield task(%s) state=%d", tk->DebugInfo(), tk->state_);
-    ++tk->yield_count_;
-    int ret = swapcontext(&tk->ctx_, &GetLocalInfo().scheduler);
-    if (ret) {
-        fprintf(stderr, "swapcontext error:%s\n", strerror(errno));
-        ThrowError(eCoErrorCode::ec_yield_failed);
-    }
+    tk->proc_->Yield(GetLocalInfo());
 }
 
 uint32_t Scheduler::Run()
 {
-    uint32_t run_count = DoRunnable();
+    ThreadLocalInfo &info = GetLocalInfo();
+    if (!info.thread_id) {
+        info.thread_id = ++ thread_id_;
+    }
+
+    // 创建、增补P
+    CoroutineOptions &op = GetOptions();
+    if (proc_count < op.processer_count) {
+        std::unique_lock<LFLock> lock(proc_init_lock_, std::defer_lock);
+        if (lock.try_lock() && proc_count < op.processer_count) {
+            uint32_t i = proc_count;
+            for (; i < op.processer_count; ++i) {
+                Processer *proc = new Processer(op.stack_size);
+                run_proc_list_.push(proc);
+            }
+
+            proc_count = i;
+        }
+    }
+
+    uint32_t run_task_count = DoRunnable();
 
     // epoll
     int ep_count = DoEpoll();
@@ -90,7 +94,7 @@ uint32_t Scheduler::Run()
     // sleep wait.
     uint32_t sl_count = DoSleep();
 
-    if (!run_count && ep_count <= 0 && !tm_count && !sl_count) {
+    if (!run_task_count && ep_count <= 0 && !tm_count && !sl_count) {
         DebugPrint(dbg_scheduler_sleep, "sleep %d ms", (int)sleep_ms_);
         sleep_ms_ = std::min(++sleep_ms_, GetOptions().max_sleep_ms);
         usleep(sleep_ms_ * 1000);
@@ -98,7 +102,7 @@ uint32_t Scheduler::Run()
         sleep_ms_ = 1;
     }
 
-    return run_count;
+    return run_task_count;
 }
 
 void Scheduler::RunUntilNoTask()
@@ -111,110 +115,35 @@ void Scheduler::RunUntilNoTask()
 // Run函数的一部分, 处理runnable状态的协程
 uint32_t Scheduler::DoRunnable()
 {
-    ThreadLocalInfo& info = GetLocalInfo();
-    info.current_task = NULL;
-    if (!info.thread_id)
-        info.thread_id = ++thread_id_;
-
-    uint32_t do_max_count = runnable_task_count_;
     uint32_t do_count = 0;
-
-    DebugPrint(dbg_scheduler, "Run [max_count=%u]--------------------------", do_max_count);
-
-    // 每次Run执行的协程数量不能多于当前runnable协程数量
-    // 以防wait状态的协程得不到执行。
-    while (do_count < do_max_count)
+    uint32_t proc_c = run_proc_list_.size();
+    for (uint32_t i = 0; i < proc_c; ++i)
     {
-        uint32_t cnt = std::max((uint32_t)1, std::min(
-                    do_max_count / GetOptions().chunk_count,
-                    GetOptions().max_chunk_size));
-        DebugPrint(dbg_scheduler, "want pop %u tasks.", cnt);
-        SList<Task> slist = run_tasks_.pop(cnt);
-        DebugPrint(dbg_scheduler, "really pop %u tasks.", cnt);
-        if (slist.empty()) break;
+        Processer *proc = run_proc_list_.pop();
+        if (!proc) break;
 
-        SList<Task>::iterator it = slist.begin();
-        while (it != slist.end())
-        {
-            Task* tk = &*it;
-            info.current_task = tk;
-            tk->state_ = TaskState::runnable;
-            DebugPrint(dbg_switch, "enter task(%s)", tk->DebugInfo());
-            int ret = swapcontext(&info.scheduler, &tk->ctx_);
-            if (ret) {
-                fprintf(stderr, "swapcontext error:%s\n", strerror(errno));
-                run_tasks_.push(slist);
-                ThrowError(eCoErrorCode::ec_swapcontext_failed);
-            }
-            ++do_count;
-            DebugPrint(dbg_switch, "leave task(%s) state=%d", tk->DebugInfo(), tk->state_);
-            info.current_task = NULL;
-
-            switch (tk->state_) {
-                case TaskState::runnable:
-                    ++it;
-                    break;
-
-                case TaskState::io_block:
-                    --runnable_task_count_;
-                    it = slist.erase(it);
-                    io_wait_.SchedulerSwitch(tk);
-                    break;
-
-                case TaskState::sleep:
-                    --runnable_task_count_;
-                    it = slist.erase(it);
-                    sleep_wait_.SchedulerSwitch(tk);
-                    break;
-
-                case TaskState::sys_block:
-                case TaskState::user_block:
-                    {
-                        if (tk->block_) {
-                            it = slist.erase(it);
-                            if (tk->block_->AddWaitTask(tk))
-                                --runnable_task_count_;
-                            else
-                                run_tasks_.push(tk);
-                            tk->block_ = NULL;
-                        } else {
-                            std::unique_lock<LFLock> lock(user_wait_lock_);
-                            auto &zone = user_wait_tasks_[tk->user_wait_type_];
-                            auto &wait_pair = zone[tk->user_wait_id_];
-                            auto &task_queue = wait_pair.second;
-                            if (wait_pair.first) {
-                                --wait_pair.first;
-                                tk->state_ = TaskState::runnable;
-                                ++it;
-                            } else {
-                                --runnable_task_count_;
-                                it = slist.erase(it);
-                                task_queue.push(tk);
-                            }
-                            ClearWaitPairWithoutLock(tk->user_wait_type_,
-                                    tk->user_wait_id_, zone, wait_pair);
-                        }
-                    }
-                    break;
-
-                case TaskState::done:
-                default:
-                    --task_count_;
-                    --runnable_task_count_;
-                    it = slist.erase(it);
-                    DebugPrint(dbg_task, "task(%s) done.", tk->DebugInfo());
-                    if (tk->eptr_) {
-                        std::exception_ptr ep = tk->eptr_;
-                        run_tasks_.push(slist);
-                        tk->DecrementRef();
-                        std::rethrow_exception(ep);
-                    } else
-                        tk->DecrementRef();
-                    break;
+        // cherry-pick tasks.
+        if (!run_tasks_.empty()) {
+            uint32_t task_c = task_count_;
+            uint32_t average = task_c / proc_c + (task_c % proc_c ? 1 : 0);
+            for (uint32_t ti = proc->GetTaskCount(); ti < average; ++ti) {
+                Task *tk = run_tasks_.pop();
+                if (!tk) break;
+                proc->AddTaskRunnable(tk);
             }
         }
-        DebugPrint(dbg_scheduler, "push %u task return to runnable list", (uint32_t)slist.size());
-        run_tasks_.push(slist);
+
+        uint32_t done_count = 0;
+        try {
+            do_count += proc->Run(GetLocalInfo(), done_count);
+        } catch (...) {
+            task_count_ -= done_count;
+            run_proc_list_.push(proc);
+            throw ;
+        }
+        task_count_ -= done_count;
+
+        run_proc_list_.push(proc);
     }
 
     return do_count;
@@ -254,19 +183,15 @@ void Scheduler::RunLoop()
 void Scheduler::AddTaskRunnable(Task* tk)
 {
     DebugPrint(dbg_scheduler, "Add task(%s) to runnable list.", tk->DebugInfo());
-    tk->state_ = TaskState::runnable;
-    run_tasks_.push(tk);
-    ++runnable_task_count_;
+    if (tk->proc_)
+        tk->proc_->AddTaskRunnable(tk);
+    else
+        run_tasks_.push(tk);
 }
 
 uint32_t Scheduler::TaskCount()
 {
     return task_count_;
-}
-
-uint32_t Scheduler::RunnableTaskCount()
-{
-    return runnable_task_count_;
 }
 
 uint64_t Scheduler::GetCurrentTaskID()

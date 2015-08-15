@@ -45,10 +45,12 @@ public:
     TSQueueHook* head_;
     TSQueueHook* tail_;
     void *check_;
+    std::size_t count_;
 
 public:
-    SList() : head_(NULL), tail_(NULL), check_(NULL) {}
-    SList(TSQueueHook* h, TSQueueHook* t, void *c) : head_(h), tail_(t), check_(c) {}
+    SList() : head_(NULL), tail_(NULL), check_(NULL), count_(0) {}
+    SList(TSQueueHook* h, TSQueueHook* t, std::size_t count, void *c)
+        : head_(h), tail_(t), check_(c), count_(count) {}
 
     iterator begin() { return iterator{head_}; }
     iterator end() { return iterator(); }
@@ -62,13 +64,12 @@ public:
         else tail_ = tail_->prev;
         hook->prev = hook->next = NULL;
         hook->check_ = NULL;
+        -- count_;
         return it;
     }
     std::size_t size() const
     {
-        std::size_t s = 0;
-        for (TSQueueHook* pos = head_; pos; pos = pos->next, ++s) ;
-        return s;
+        return count_;
     }
 
     inline TSQueueHook* head() { return head_; }
@@ -85,11 +86,13 @@ class TSQueue
             fake_lock_guard>::type LockGuard;
     TSQueueHook* head_;
     TSQueueHook* tail_;
+    std::size_t count_;
 
 public:
     TSQueue()
     {
         head_ = tail_ = new TSQueueHook;
+        count_ = 0;
     }
 
     ~TSQueue()
@@ -110,6 +113,12 @@ public:
         return head_ == tail_;
     }
 
+    std::size_t size()
+    {
+        LockGuard lock(lck);
+        return count_;
+    }
+
     void push(T* element)
     {
         LockGuard lock(lck);
@@ -119,6 +128,7 @@ public:
         hook->next = NULL;
         hook->check_ = this;
         tail_ = hook;
+        ++ count_;
     }
 
     T* pop()
@@ -132,6 +142,7 @@ public:
         if (ptr->next) ptr->next->prev = head_;
         ptr->prev = ptr->next = NULL;
         ptr->check_ = NULL;
+        -- count_;
         return (T*)ptr;
     }
 
@@ -140,6 +151,7 @@ public:
         assert(elements.check(this));
         if (elements.empty()) return ;
         LockGuard lock(lck);
+        count_ += elements.size();
         tail_->next = elements.head();
         elements.head()->prev = tail_;
         elements.tail()->next = NULL;
@@ -153,13 +165,15 @@ public:
         if (head_ == tail_) return SList<T>();
         TSQueueHook* first = head_->next;
         TSQueueHook* last = first;
-        for (uint32_t i = 1; i < n && last->next; ++i)
+        uint32_t c = 1;
+        for (; c < n && last->next; ++c)
             last = last->next;
         if (last == tail_) tail_ = head_;
         head_->next = last->next;
         if (last->next) last->next->prev = head_;
         first->prev = last->next = NULL;
-        return SList<T>(first, last, this);
+        count_ -= c;
+        return SList<T>(first, last, c, this);
     }
 
     bool erase(TSQueueHook* hook)
@@ -171,6 +185,7 @@ public:
         else if (hook == tail_) tail_ = tail_->prev;
         hook->prev = hook->next = NULL;
         hook->check_ = NULL;
+        -- count_;
         return true;
     }
 };

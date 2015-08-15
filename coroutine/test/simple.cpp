@@ -24,7 +24,7 @@ void f1()
 
 int main()
 {
-//    g_Scheduler.GetOptions().debug = dbg_all;
+//    g_Scheduler.GetOptions().debug = co::dbg_all;
     go f1;
     cout << "go" << endl;
     while (!g_Scheduler.IsEmpty()) {

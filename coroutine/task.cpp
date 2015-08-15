@@ -1,7 +1,7 @@
 #include "task.h"
 #include <iostream>
-#include "scheduler.h"
 #include <string.h>
+#include "scheduler.h"
 
 namespace co
 {
@@ -53,19 +53,25 @@ static void C_func(Task* self)
     Scheduler::getInstance().Yield();
 }
 
-Task::Task(TaskF const& fn, int stack_size)
-    : id_(++s_id), state_(TaskState::runnable), yield_count_(0),
-    fn_(fn), stack_(NULL), ref_count_{1}, block_(NULL),
-    sleep_ms_(0)
+Task::Task(TaskF const& fn)
+    : id_(++s_id), fn_(fn)
 {
     ++s_task_count;
-    stack_ = new char[stack_size];
-    if (!stack_) {
-        state_ = TaskState::fatal;
-        fprintf(stderr, "task(%s) init, new stack error\n", DebugInfo());
-        return ;
-    }
+}
 
+Task::~Task()
+{
+    --s_task_count;
+    if (stack_) {
+        free(stack_);
+        stack_ = NULL;
+    }
+}
+
+void Task::AddIntoProcesser(Processer *proc, char* shared_stack, uint32_t shared_stack_cap)
+{
+    assert(!proc_);
+    proc_ = proc;
     if (-1 == getcontext(&ctx_)) {
         state_ = TaskState::fatal;
         fprintf(stderr, "task(%s) init, getcontext error:%s\n",
@@ -73,19 +79,19 @@ Task::Task(TaskF const& fn, int stack_size)
         return ;
     }
 
-    ctx_.uc_stack.ss_sp = stack_;
-    ctx_.uc_stack.ss_size = stack_size;
+    ctx_.uc_stack.ss_sp = shared_stack;
+    ctx_.uc_stack.ss_size = shared_stack_cap;
     ctx_.uc_link = NULL;
     makecontext(&ctx_, (void(*)(void))&C_func, 1, this);
-}
 
-Task::~Task()
-{
-    --s_task_count;
-    if (stack_) {
-        delete []stack_;
-        stack_ = NULL;
-    }
+    // save coroutine stack first 16 bytes.
+    assert(!stack_);
+    stack_size_ = 16;
+    stack_capacity_ = std::max<uint32_t>(16, g_Scheduler.GetOptions().init_stack_size);
+    stack_ = (char*)malloc(stack_capacity_);
+    memcpy(stack_, shared_stack + shared_stack_cap - stack_size_, stack_size_);
+
+    state_ = TaskState::runnable;
 }
 
 void Task::SetDebugInfo(std::string const& info)
