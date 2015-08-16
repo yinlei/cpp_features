@@ -76,13 +76,13 @@ int main()
     go fn;
 
     // 协程创建以后不会立即执行，而是暂存至可执行列表中，等待调度器调度。
-    // g_Scheduler是全局唯一的协程调度器，有以下接口可以调度协程：
+    // co_sched是全局唯一的协程调度器，有以下接口可以调度协程：
     //   1.Run 执行单次调度, 返回本次执行的协程数量
     //   2.RunLoop 无限循环执行Run, 不会返回
     //   3.RunUntilNoTask 循环执行Run, 直至协程数量为零.
     //
     // 当仅使用一些线程进行协程调度时, 协程地执行会严格地遵循其创建顺序.
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
     return 0;
 }
 

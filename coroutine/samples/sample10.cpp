@@ -40,7 +40,7 @@ int main(int argc, char** argv)
         ch_0 >> i;
         printf("i = %d\n", i);
     };
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
 
     /*********************** 2. 带缓冲区的Channel ************************/
     // 创建缓冲区容量为1的Channel, 传递智能指针:
@@ -66,7 +66,7 @@ int main(int argc, char** argv)
         ch_1 >> ptr;
         printf("*ptr = %d\n", *ptr);
     };
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
 
     /*********************** 3. 支持隐式转换 ************************/
     // Channel在写入数据和读取数据时均支持隐式转换

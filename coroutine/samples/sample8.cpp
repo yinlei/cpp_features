@@ -37,7 +37,7 @@ int main()
     boost::thread_group tg;
     for (int i = 0; i < 8; ++i)
         tg.create_thread([] {
-                g_Scheduler.RunUntilNoTask();
+                co_sched.RunUntilNoTask();
                 });
     tg.join_all();
 

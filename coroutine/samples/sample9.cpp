@@ -51,8 +51,8 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-//    g_Scheduler.GetOptions().debug = dbg_all;
-//    g_Scheduler.GetOptions().debug_output = fopen("log", "w+");
+//    co_sched.GetOptions().debug = dbg_all;
+//    co_sched.GetOptions().debug_output = fopen("log", "w+");
 
     int concurrency = atoi(argv[2]);
 
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
     // 创建8个线程去并行执行所有协程
     boost::thread_group tg;
     for (int i = 0; i < 8; ++i)
-        tg.create_thread([]{ g_Scheduler.RunLoop(); });
+        tg.create_thread([]{ co_sched.RunLoop(); });
     tg.join_all();
     return 0;
 }

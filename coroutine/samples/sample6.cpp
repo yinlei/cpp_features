@@ -40,7 +40,7 @@ int main()
         }
     };
 
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
     return 0;
 }
 

@@ -102,7 +102,7 @@ int main()
     go client;
 
     // 单线程执行
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
     return 0;
 }
 

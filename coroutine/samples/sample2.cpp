@@ -38,7 +38,7 @@ int main()
         printf("4\n");
     };
 
-    g_Scheduler.RunUntilNoTask();
+    co_sched.RunUntilNoTask();
     return 0;
 }
 

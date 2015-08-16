@@ -46,7 +46,7 @@ int main()
         };
 
     while (!is_exit)
-        g_Scheduler.Run();
+        co_sched.Run();
     return 0;
 }
 
