@@ -17,7 +17,7 @@ void f1()
         //printf("f1 %d\n", g_value++);
         g_value++;
         usleep(1000);
-        yield;
+        co_yield;
     }
 }
 

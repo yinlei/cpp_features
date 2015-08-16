@@ -15,7 +15,7 @@ void f1()
     for (int i = 0; i < switch_per_co; ++i) {
         //printf("f1 %d\n", g_value++);
         g_value++;
-        yield;
+        co_yield;
     }
 }
 

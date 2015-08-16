@@ -36,7 +36,7 @@ void client()
                 auto n = s->write_some(buffer(buf, qdata), ec);
                 if (ec) break;
                 if ((noyield_for_c & 0x7f) == 0)
-                    yield;
+                    co_yield;
                 g_sendbytes += n;
             }
             err << true;
@@ -53,7 +53,7 @@ void client()
                 std::size_t rn = s->read_some(buffer(buf, buflen), ec);
                 if (ec) break;
                 if ((noyield_for_c & 0x7f) == 0)
-                    yield;
+                    co_yield;
                 g_recvbytes += rn;
             }
             err << true;

@@ -63,7 +63,7 @@ goon_write:
                     n -= rn;
                     begin += rn;
                     if ((noyield_for_c & 0xff) == 0)
-                        yield;
+                        co_yield;
 
                     if (n > 0) {
                         ++noyield_for_c;

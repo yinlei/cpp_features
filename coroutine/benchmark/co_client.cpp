@@ -39,7 +39,7 @@ void client()
                 auto n = write(sock_fd, buf, qdata);
                 if (n == 0) break;
                 if ((noyield_for_c & 0x7f) == 0)
-                    yield;
+                    co_yield;
                 g_sendbytes += n;
             }
             err << true;
@@ -56,7 +56,7 @@ void client()
                 if (rn < 0 && EINTR == errno) continue;
                 if (rn == 0) break;
                 if ((noyield_for_c & 0x7f) == 0)
-                    yield;
+                    co_yield;
                 g_recvbytes += rn;
             }
             err << true;

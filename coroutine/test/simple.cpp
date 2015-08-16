@@ -6,9 +6,9 @@ using namespace std;
 void f2()
 {
     cout << 2 << endl;
-    yield;
+    co_yield;
     cout << 4 << endl;
-    yield;
+    co_yield;
     cout << 6 << endl;
 }
 
@@ -16,9 +16,9 @@ void f1()
 {
     go f2;
     cout << 1 << endl;
-    yield;
+    co_yield;
     cout << 3 << endl;
-    yield;
+    co_yield;
     cout << 5 << endl;
 }
 
