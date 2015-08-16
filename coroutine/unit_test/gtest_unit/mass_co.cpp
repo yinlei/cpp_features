@@ -24,9 +24,9 @@ static uint32_t c = 0;
 void foo()
 {
     ++c;
-    yield;
+    co_yield;
     ++c;
-    yield;
+    co_yield;
 }
 
 TEST_P(MassCo, CnK)

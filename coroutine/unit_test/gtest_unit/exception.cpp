@@ -10,7 +10,7 @@ static std::atomic<int> g_value{0};
 
 void inc_foo()
 {
-    yield;
+    co_yield;
     ++g_value;
 }
 
@@ -21,7 +21,7 @@ void throw_foo()
 
 void yield_throw_foo()
 {
-    yield;
+    co_yield;
     throw 5;
 }
 

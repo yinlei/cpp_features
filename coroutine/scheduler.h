@@ -86,6 +86,8 @@ struct ThreadLocalInfo
     uint32_t thread_id = 0;     // Run thread index, increment from 1.
 };
 
+class ThreadPool;
+
 class Scheduler
 {
     public:
@@ -169,13 +171,22 @@ class Scheduler
         TimerId ExpireAt(CoTimerMgr::TimePoint const& time_point, CoTimer::fn_t const& fn);
 
         template <typename Duration>
-        TimerId ExpireAt(Duration const& duration, CoTimer::fn_t const& fn);
+        TimerId ExpireAt(Duration const& duration, CoTimer::fn_t const& fn)
+        {
+            return this->ExpireAt(CoTimerMgr::Now() + duration, fn);
+        }
 
         bool CancelTimer(TimerId timer_id);
         bool BlockCancelTimer(TimerId timer_id);
         // }@
         /// ------------------------------------------------------------------------
     
+        /// ------------------------------------------------------------------------
+        // @{ 线程池
+        ThreadPool& GetThreadPool();
+        // }@
+        /// ------------------------------------------------------------------------
+
     public:
         Task* GetCurrentTask();
 
@@ -251,6 +262,8 @@ class Scheduler
         // Timer manager.
         CoTimerMgr timer_mgr_;
 
+        ThreadPool *thread_pool_;
+
         std::atomic<uint32_t> task_count_{0};
         std::atomic<uint8_t> sleep_ms_{0};
         std::atomic<uint32_t> thread_id_{0};
@@ -261,8 +274,6 @@ class Scheduler
     friend class SleepWait;
     friend class Processer;
 };
-
-#include "scheduler-inl.h"
 
 } //namespace co
 

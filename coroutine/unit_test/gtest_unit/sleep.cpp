@@ -56,7 +56,7 @@ struct Sleep : public TestWithParam<sleep_type>
 
 TEST_P(Sleep, sleep0)
 {
-    g_Scheduler.GetOptions().debug = dbg_sleepblock;
+//    g_Scheduler.GetOptions().debug = dbg_sleepblock;
 
     int c = 0, n = 2;
     for (int i = 0; i < n; ++i)
@@ -75,7 +75,7 @@ TEST_P(Sleep, sleep0)
 
 TEST_P(Sleep, sleep1)
 {
-    g_Scheduler.GetOptions().debug = dbg_sleepblock;
+//    g_Scheduler.GetOptions().debug = dbg_sleepblock;
 
     int c = 0, n = 2;
     for (int i = 0; i < n; ++i)

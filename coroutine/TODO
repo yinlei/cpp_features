@@ -1,6 +1,5 @@
 TODO:
 HOOK select poll时, 正确处理文件句柄
-尝试HOOK socket函数族其他可能阻塞的函数，比如getaddrbyname
 考虑移植Windows: 1.HOOK WINAPI, boost.asio替代epoll 2.ucontext->boost.context
 
 DONE:
@@ -20,3 +19,4 @@ DONE:
 添加命名空间
 HOOK read write时, 不要影响读文件
 使用shared-stack方案, 降低一点点协程切换速度换取内存的节约使用, 支持创建海量协程
+网络IO以外的阻塞调用, 可以使用co_await异步化

@@ -1,6 +1,7 @@
 #pragma once
 #include "scheduler.h"
 #include "channel.h"
+#include "thread_pool.h"
 
 namespace co
 {
@@ -39,10 +40,39 @@ inline bool co_timer_cancel(TimerId timer_id) {
 inline bool co_timer_block_cancel(TimerId timer_id) {
     return g_Scheduler.BlockCancelTimer(timer_id);
 }
+
+template <typename R>
+struct __async_wait
+{
+    R result_;
+    Channel<R> ch_;
+
+    template <typename F>
+    inline R&& operator-(F const& fn)
+    {
+        g_Scheduler.GetThreadPool().AsyncWait<R>(ch_, fn);
+        ch_ >> result_;
+        return std::move(result_);
+    }
+};
+
+template <>
+struct __async_wait<void>
+{
+    Channel<void> ch_;
+
+    template <typename F>
+    inline void operator-(F const& fn)
+    {
+        g_Scheduler.GetThreadPool().AsyncWait<void>(ch_, fn);
+        ch_ >> nullptr;
+    }
+};
+
 } //namespace co
 
 #define go ::co::__go()-
-#define yield do { g_Scheduler.Yield(); } while (0)
+#define co_yield do { g_Scheduler.Yield(); } while (0)
 
 // (uint32_t type, uint64_t id)
 #define co_wait(type, id) do { g_Scheduler.UserBlockWait(type, id); } while (0)
@@ -60,8 +90,11 @@ using ::co::co_mutex;
 // co_chan
 using ::co::co_chan;
 
-using ::co::TimerId;
+// co timer *
+typedef ::co::TimerId co_timer_id;
 using ::co::co_timer_add;
 using ::co::co_timer_cancel;
 using ::co::co_timer_block_cancel;
 
+// co_await
+#define co_await(type) ::co::__async_wait<type>()-

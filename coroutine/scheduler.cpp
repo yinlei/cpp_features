@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <system_error>
 #include <unistd.h>
+#include "thread_pool.h"
 
 namespace co
 {
@@ -17,11 +18,13 @@ Scheduler& Scheduler::getInstance()
 extern void coroutine_hook_init();
 Scheduler::Scheduler()
 {
+    thread_pool_ = new ThreadPool;
     coroutine_hook_init();
 }
 
 Scheduler::~Scheduler()
 {
+    delete thread_pool_;
 }
 
 ThreadLocalInfo& Scheduler::GetLocalInfo()
@@ -287,6 +290,11 @@ bool Scheduler::BlockCancelTimer(TimerId timer_id)
     DebugPrint(dbg_timer, "block_cancel timer %llu %s", (long long unsigned)timer_id->GetId(),
             ok ? "success" : "failed");
     return ok;
+}
+
+ThreadPool& Scheduler::GetThreadPool()
+{
+    return *thread_pool_;
 }
 
 bool Scheduler::BlockWait(int64_t type, uint64_t wait_id)

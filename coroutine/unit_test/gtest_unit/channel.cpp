@@ -191,7 +191,7 @@ TEST(Channel, capacity0Try)
     int i = 0;
     // try pop
     {
-        go [&]{ EXPECT_FALSE(ch.TryPop(i)); EXPECT_YIELD(0); yield; EXPECT_TRUE(ch.TryPop(i)); EXPECT_YIELD(2); };
+        go [&]{ EXPECT_FALSE(ch.TryPop(i)); EXPECT_YIELD(0); co_yield; EXPECT_TRUE(ch.TryPop(i)); EXPECT_YIELD(2); };
         go [&]{ ch << 1; EXPECT_YIELD(1);};
         g_Scheduler.RunUntilNoTask();
         EXPECT_EQ(i, 1);
@@ -215,7 +215,7 @@ TEST(Channel, capacity0Try)
 
     // try push
     {
-        go [&]{ EXPECT_FALSE(ch.TryPush(1)); EXPECT_YIELD(0); yield; EXPECT_TRUE(ch.TryPush(1)); EXPECT_YIELD(1); };
+        go [&]{ EXPECT_FALSE(ch.TryPush(1)); EXPECT_YIELD(0); co_yield; EXPECT_TRUE(ch.TryPush(1)); EXPECT_YIELD(1); };
         go [&]{ ch >> i; EXPECT_YIELD(1);};
         g_Scheduler.RunUntilNoTask();
         EXPECT_EQ(i, 1);
@@ -245,7 +245,7 @@ TEST(Channel, capacity0Try)
             for (;;) {
                 if (ch.TryPush(7))
                     break;
-                yield;
+                co_yield;
             }
             push_done = ++step;
         };
@@ -253,7 +253,7 @@ TEST(Channel, capacity0Try)
             for (;;) {
                 if (ch.TryPop(i))
                     break;
-                yield;
+                co_yield;
             }
             pop_done = ++step;
         };
@@ -262,7 +262,7 @@ TEST(Channel, capacity0Try)
                     go [&] {
                         wake = ++step;
                         ch << 7;
-                        yield;
+                        co_yield;
                         ch >> nullptr;
                         wake_done = ++step;
                     };
@@ -286,7 +286,7 @@ TEST(Channel, capacity1Try)
     int i = 0;
     // try pop
     {
-        go [&]{ EXPECT_FALSE(ch.TryPop(i)); EXPECT_YIELD(0); yield; EXPECT_TRUE(ch.TryPop(i)); EXPECT_YIELD(1); };
+        go [&]{ EXPECT_FALSE(ch.TryPop(i)); EXPECT_YIELD(0); co_yield; EXPECT_TRUE(ch.TryPop(i)); EXPECT_YIELD(1); };
         go [&]{ ch << 1; EXPECT_YIELD(0);};
         g_Scheduler.RunUntilNoTask();
         EXPECT_EQ(i, 1);
@@ -311,7 +311,7 @@ TEST(Channel, capacity1Try)
     // try push
     {
         ch << 0;
-        go [&]{ EXPECT_FALSE(ch.TryPush(1)); EXPECT_YIELD(0); yield; EXPECT_TRUE(ch.TryPush(1)); EXPECT_YIELD(1); };
+        go [&]{ EXPECT_FALSE(ch.TryPush(1)); EXPECT_YIELD(0); co_yield; EXPECT_TRUE(ch.TryPush(1)); EXPECT_YIELD(1); };
         go [&]{ ch >> i; EXPECT_YIELD(0);};
         g_Scheduler.RunUntilNoTask();
         EXPECT_EQ(i, 0);

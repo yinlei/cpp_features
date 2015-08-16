@@ -20,8 +20,8 @@ int main()
     // co_timer_add接受两个参数
     // 第一个参数可以是std::chrono中的时间长度，也可以是时间点。
     // 第二个参数是定时器回调函数
-    // 返回一个uint64_t类型的ID, 通过这个ID可以撤销还未执行的定时函数
-    TimerId id1 = co_timer_add(std::chrono::seconds(1), [&]{
+    // 返回一个co_timer_id类型的ID, 通过这个ID可以撤销还未执行的定时函数
+    co_timer_id id1 = co_timer_add(std::chrono::seconds(1), [&]{
             printf("Timer Callback.\n");
             });
 
