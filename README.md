@@ -31,7 +31,7 @@ coroutine有以下特点：
 ##### coroutine库的链接方法：
      * 动态链接时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
        g++ -std=c++11 test.cpp -lcoroutine -ldl [-lother_libs]
-     * 静态链接时，只需链接libcoroutine.a即可，不要求链接顺序. 例如:
+     * 静态链接时，只需链接libcoroutine.a即可，不要求第一个被链接，但要求libc.a最后被链接. 例如:
        g++ -std=c++11 test.cpp -lcoroutine -static -static-libgcc -static-libstdc++
 
 ##### 注意事项：
