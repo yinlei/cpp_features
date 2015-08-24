@@ -1,24 +1,20 @@
 CC=g++
 CFLAGS=-std=c++11 -g -Wall -fPIC
 STATIC_LIB=libwin_patch.a
-DYNAMIC_LIB=libwin_patch.so
+INCLUDE=-IG:/usr/boost_1_59_0
 OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
 
-all : $(STATIC_LIB) $(DYNAMIC_LIB)
+all : $(STATIC_LIB)
 
 $(STATIC_LIB) : $(OBJS)
 	@ar cr $@ $^
 	@echo "LD $(STATIC_LIB)"
 
-$(DYNAMIC_LIB) : $(OBJS)
-	@$(CC) $(CFLAGS) -shared $^ -o $@
-	@echo "LD $(DYNAMIC_LIB)"
-
 .cpp.o:
 	@echo "CC $@"
-	@$(CC) $(CFLAGS) -c $^ -o $@
+	@$(CC) $(CFLAGS) $(INCLUDE) -c $^ -o $@
 
 .PHONY: clean
 
 clean:
-	rm *.o $(STATIC_LIB) $(DYNAMIC_LIB) -f
+	rm *.o $(STATIC_LIB) -f
