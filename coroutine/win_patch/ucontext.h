@@ -1,6 +1,7 @@
 #pragma once
 
 #include <boost/version.hpp>
+#include <boost/asio.hpp>
 #include <boost/context/all.hpp>
 
 #if (BOOST_VERSION < 105900)

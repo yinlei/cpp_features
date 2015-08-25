@@ -19,6 +19,9 @@
     <Filter Include="源文件\win_patch\sys">
       <UniqueIdentifier>{b26794aa-439f-49e4-a586-6f766f53947f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="源文件\win_patch\arpa">
+      <UniqueIdentifier>{c30ed822-41eb-4d3c-8a62-aa35b800a81b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -109,6 +112,15 @@
     </ClInclude>
     <ClInclude Include="..\win_io_wait.h">
       <Filter>源文件\win_patch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\arpa\inet.h">
+      <Filter>源文件\win_patch\arpa</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sys\socket.h">
+      <Filter>源文件\win_patch\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="..\sys\resource.h">
+      <Filter>源文件\win_patch\sys</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

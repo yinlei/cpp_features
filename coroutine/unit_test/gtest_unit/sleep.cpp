@@ -1,7 +1,5 @@
 #include <iostream>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
 #include <gtest/gtest.h>
 #include "test_server.h"
 #include "coroutine.h"

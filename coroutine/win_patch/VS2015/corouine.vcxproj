@@ -161,7 +161,10 @@
     <ClInclude Include="..\..\thread_pool.h" />
     <ClInclude Include="..\..\timer.h" />
     <ClInclude Include="..\..\ts_queue.h" />
+    <ClInclude Include="..\arpa\inet.h" />
     <ClInclude Include="..\sys\epoll.h" />
+    <ClInclude Include="..\sys\resource.h" />
+    <ClInclude Include="..\sys\socket.h" />
     <ClInclude Include="..\ucontext.h" />
     <ClInclude Include="..\unistd.h" />
     <ClInclude Include="..\win_io_wait.h" />
