@@ -138,7 +138,6 @@
     <ClCompile Include="..\..\block_object.cpp" />
     <ClCompile Include="..\..\co_mutex.cpp" />
     <ClCompile Include="..\..\error.cpp" />
-    <ClCompile Include="..\..\io_wait.cpp" />
     <ClCompile Include="..\..\processer.cpp" />
     <ClCompile Include="..\..\scheduler.cpp" />
     <ClCompile Include="..\..\sleep_wait.cpp" />
@@ -146,6 +145,7 @@
     <ClCompile Include="..\..\thread_pool.cpp" />
     <ClCompile Include="..\..\timer.cpp" />
     <ClCompile Include="..\ucontext.cpp" />
+    <ClCompile Include="..\win_io_wait.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\block_object.h" />
@@ -153,7 +153,6 @@
     <ClInclude Include="..\..\coroutine.h" />
     <ClInclude Include="..\..\co_mutex.h" />
     <ClInclude Include="..\..\error.h" />
-    <ClInclude Include="..\..\io_wait.h" />
     <ClInclude Include="..\..\processer.h" />
     <ClInclude Include="..\..\scheduler.h" />
     <ClInclude Include="..\..\sleep_wait.h" />
@@ -164,6 +163,8 @@
     <ClInclude Include="..\..\ts_queue.h" />
     <ClInclude Include="..\sys\epoll.h" />
     <ClInclude Include="..\ucontext.h" />
+    <ClInclude Include="..\unistd.h" />
+    <ClInclude Include="..\win_io_wait.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

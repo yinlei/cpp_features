@@ -22,7 +22,7 @@ uint32_t ThreadPool::Run()
     }
 
     if (!c) {
-        uint8_t sleep_ms = std::min(sleep_ms_++, g_Scheduler.GetOptions().max_sleep_ms);
+        uint8_t sleep_ms = (std::min)(sleep_ms_++, g_Scheduler.GetOptions().max_sleep_ms);
         usleep(sleep_ms * 1000);
     } else {
         sleep_ms_ = 0;

@@ -99,7 +99,7 @@ uint32_t Scheduler::Run()
 
     if (!run_task_count && ep_count <= 0 && !tm_count && !sl_count) {
         DebugPrint(dbg_scheduler_sleep, "sleep %d ms", (int)sleep_ms_);
-        sleep_ms_ = std::min(++sleep_ms_, GetOptions().max_sleep_ms);
+        sleep_ms_ = (std::min)(++sleep_ms_, GetOptions().max_sleep_ms);
         usleep(sleep_ms_ * 1000);
     } else {
         sleep_ms_ = 1;

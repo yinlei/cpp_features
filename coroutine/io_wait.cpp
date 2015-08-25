@@ -1,5 +1,5 @@
 #include "io_wait.h"
-#include <sys/poll.h>
+#include <sys/epoll.h>
 #include "scheduler.h"
 
 namespace co

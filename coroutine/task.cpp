@@ -1,6 +1,7 @@
 #include "task.h"
 #include <iostream>
 #include <string.h>
+#include <string>
 #include "scheduler.h"
 
 namespace co

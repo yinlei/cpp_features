@@ -10,19 +10,11 @@
 
 namespace co {
 
-#ifdef OLD_BOOST_CONTEXT
-typedef struct sigaltstack {                       
-    void *ss_sp;          
-    int ss_flags;         
-    size_t ss_size;       
-} stack_t;              
-#else
-typedef struct sigaltstack {                       
-    void **ss_sp;          
-    int ss_flags;         
-    size_t ss_size;       
-} stack_t;              
-#endif
+typedef struct sigaltstack {
+    void *ss_sp;
+    int ss_flags;
+    size_t ss_size;
+} stack_t;
 
 struct ucontext_t
 {

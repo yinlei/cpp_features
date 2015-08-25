@@ -2,6 +2,10 @@
 #include "task.h"
 #include "ts_queue.h"
 
+#ifdef Yield
+#undef Yield
+#endif
+
 namespace co {
 
 struct ThreadLocalInfo;

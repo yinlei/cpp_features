@@ -33,9 +33,6 @@
     <ClCompile Include="..\..\error.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\io_wait.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\processer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
@@ -57,6 +54,9 @@
     <ClCompile Include="..\ucontext.cpp">
       <Filter>源文件\win_patch</Filter>
     </ClCompile>
+    <ClCompile Include="..\win_io_wait.cpp">
+      <Filter>源文件\win_patch</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\block_object.h">
@@ -72,9 +72,6 @@
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="..\..\error.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\io_wait.h">
       <Filter>源文件</Filter>
     </ClInclude>
     <ClInclude Include="..\..\processer.h">
@@ -106,6 +103,12 @@
     </ClInclude>
     <ClInclude Include="..\sys\epoll.h">
       <Filter>源文件\win_patch\sys</Filter>
+    </ClInclude>
+    <ClInclude Include="..\unistd.h">
+      <Filter>源文件\win_patch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\win_io_wait.h">
+      <Filter>源文件\win_patch</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
