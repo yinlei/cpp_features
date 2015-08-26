@@ -6,7 +6,6 @@
 #include <time.h>
 #include <chrono>
 #include <boost/any.hpp>
-#include <dlfcn.h>
 #include "coroutine.h"
 using namespace std;
 using namespace co;

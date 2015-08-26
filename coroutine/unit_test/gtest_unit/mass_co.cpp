@@ -5,7 +5,6 @@
 #include "coroutine.h"
 #include <chrono>
 #include <time.h>
-#include <poll.h>
 using namespace std;
 using namespace co;
 

@@ -21,22 +21,10 @@
     <ClCompile Include="..\..\unit_test\gtest_unit\exception.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\unit_test\gtest_unit\file.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\unit_test\gtest_unit\io_timed.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\unit_test\gtest_unit\mass_co.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\unit_test\gtest_unit\poll.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\unit_test\gtest_unit\select.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\unit_test\gtest_unit\sleep.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="..\..\unit_test\gtest_unit\timer.cpp">

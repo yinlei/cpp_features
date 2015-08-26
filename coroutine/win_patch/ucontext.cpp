@@ -11,8 +11,9 @@ void makecontext(ucontext_t *ucp, void (*func)(), int argc, void* argv)
     ucp->native = ::boost::context::make_fcontext(ucp->uc_stack.ss_sp,
             ucp->uc_stack.ss_size, (void(*)(intptr_t))func);
 #else
-    ucp->native = ::boost::context::make_fcontext((void**)ucp->uc_stack.ss_sp,
-            ucp->uc_stack.ss_size, (void(*)(intptr_t))func);
+    ucp->native = ::boost::context::make_fcontext(
+        (char*)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size,
+        ucp->uc_stack.ss_size, (void(*)(intptr_t))func);
 #endif
 }
 

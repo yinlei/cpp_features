@@ -3,9 +3,12 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.23107.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "corouine", "corouine.vcxproj", "{1A9CAB71-B3D5-49CC-9967-72BFBEB8CA04}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "coroutine", "coroutine.vcxproj", "{1A9CAB71-B3D5-49CC-9967-72BFBEB8CA04}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unit_test", "unit_test.vcxproj", "{34DB370C-1EEB-437E-BE7B-4A49ABE403A7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{1A9CAB71-B3D5-49CC-9967-72BFBEB8CA04} = {1A9CAB71-B3D5-49CC-9967-72BFBEB8CA04}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
