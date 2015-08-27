@@ -57,13 +57,17 @@ struct TestServer
     ~TestServer()
     {
         is_work_ = false;
-		work_thread_.interrupt();
+        error_code ignore_ec;
+        accept_->close(ignore_ec);
+		work_thread_.join();
     }
 
     void Accept()
     {
         std::shared_ptr<tcp::socket> s(new tcp::socket(ios_));
         accept_->async_accept(*s, [=](error_code ec) {
+            if (!is_work_) return;
+
             Accept();
 //            fprintf(stderr, "connected %d\n", ++count_);
 

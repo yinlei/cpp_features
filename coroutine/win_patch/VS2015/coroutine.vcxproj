@@ -93,7 +93,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..;../..;E:\boost_1_59_0</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;../..;E:\boost_1_59_0;E:\cpp_features\coroutine\win_patch\mhook\mhook-lib;E:\cpp_features\coroutine\win_patch\mhook\disasm-lib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -149,6 +149,11 @@
     <ClCompile Include="..\..\thread_pool.cpp" />
     <ClCompile Include="..\..\timer.cpp" />
     <ClCompile Include="..\io_wait.cpp" />
+    <ClCompile Include="..\mhook\disasm-lib\cpu.c" />
+    <ClCompile Include="..\mhook\disasm-lib\disasm.c" />
+    <ClCompile Include="..\mhook\disasm-lib\disasm_x86.c" />
+    <ClCompile Include="..\mhook\disasm-lib\misc.c" />
+    <ClCompile Include="..\mhook\mhook-lib\mhook.cpp" />
     <ClCompile Include="..\platform_adapter.cpp" />
     <ClCompile Include="..\ucontext.cpp" />
     <ClCompile Include="..\win_vc_hook.cpp" />
@@ -170,6 +175,12 @@
     <ClInclude Include="..\..\ts_queue.h" />
     <ClInclude Include="..\arpa\inet.h" />
     <ClInclude Include="..\io_wait.h" />
+    <ClInclude Include="..\mhook\disasm-lib\cpu.h" />
+    <ClInclude Include="..\mhook\disasm-lib\disasm.h" />
+    <ClInclude Include="..\mhook\disasm-lib\disasm_x86.h" />
+    <ClInclude Include="..\mhook\disasm-lib\disasm_x86_tables.h" />
+    <ClInclude Include="..\mhook\disasm-lib\misc.h" />
+    <ClInclude Include="..\mhook\mhook-lib\mhook.h" />
     <ClInclude Include="..\platform_adapter.h" />
     <ClInclude Include="..\sys\epoll.h" />
     <ClInclude Include="..\sys\resource.h" />

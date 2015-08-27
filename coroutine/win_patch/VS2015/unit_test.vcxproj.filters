@@ -30,6 +30,9 @@
     <ClCompile Include="..\..\unit_test\gtest_unit\ts_queue.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\unit_test\gtest_unit\sync_asio.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\unit_test\gtest_unit\test_server.h">
