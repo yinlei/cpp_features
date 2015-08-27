@@ -64,5 +64,5 @@ INSTANTIATE_TEST_CASE_P(
 INSTANTIATE_TEST_CASE_P(
 	MassCoTest,
 	MassCo,
-	Values(1));
+	Values(1, 10, 100, 1000));
 #endif
