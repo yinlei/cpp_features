@@ -24,6 +24,7 @@ struct TestServer
     tcp::acceptor *accept_ = NULL;
     bool is_work_;
     boost::thread work_thread_;
+    int count_ = 0;
 
     TestServer() : is_work_(true)
     {
@@ -38,6 +39,7 @@ struct TestServer
         tcp::endpoint addr(address::from_string("0.0.0.0"), TEST_PORT);
         accept_ = new tcp::acceptor(ios_, addr, true);
 
+        Accept();
         boost::thread thr([&] {
             io_service::work worker(ios_); ios_.run(); 
         });
@@ -56,6 +58,7 @@ struct TestServer
         std::shared_ptr<tcp::socket> s(new tcp::socket(ios_));
         accept_->async_accept(*s, [=](error_code ec) {
             Accept();
+//            fprintf(stderr, "connected %d\n", ++count_);
 
             if (!ec)
                 Read(s, boost::shared_array<char>());
@@ -102,6 +105,8 @@ struct TestServer
     {
         error_code ignore_ec;
         s->close(ignore_ec);
+//        if (!ignore_ec)
+//            fprintf(stderr, "disconnected %d\n", --count_);
     }
 };
 static TestServer s_server;
