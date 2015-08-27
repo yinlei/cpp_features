@@ -10,7 +10,8 @@
 #include <boost/asio.hpp>
 #include <boost/smart_ptr/shared_array.hpp>
 #include <assert.h>
-using namespace ::boost::asio;
+using ::boost::asio::io_service;
+using ::boost::asio::buffer;
 using namespace ::boost::asio::ip;
 using ::boost::system::error_code;
 
@@ -47,7 +48,7 @@ struct TestServer
     ~TestServer()
     {
         is_work_ = false;
-        work_thread_.join();
+//        work_thread_.join();
     }
 
     void Accept()
@@ -89,7 +90,7 @@ struct TestServer
                 return;
             }
 
-            if (bytes < size - pos) {
+            if ((int)bytes < size - pos) {
                 Write(s, write_buf, pos + bytes, size, sbuf);
             } else {
                 Read(s, sbuf);
