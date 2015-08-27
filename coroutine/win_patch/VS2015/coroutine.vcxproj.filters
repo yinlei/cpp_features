@@ -57,13 +57,13 @@
     <ClCompile Include="..\ucontext.cpp">
       <Filter>源文件\win_patch</Filter>
     </ClCompile>
-    <ClCompile Include="..\win_io_wait.cpp">
-      <Filter>源文件\win_patch</Filter>
-    </ClCompile>
     <ClCompile Include="..\win_vc_hook.cpp">
       <Filter>源文件\win_patch</Filter>
     </ClCompile>
     <ClCompile Include="..\platform_adapter.cpp">
+      <Filter>源文件\win_patch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\io_wait.cpp">
       <Filter>源文件\win_patch</Filter>
     </ClCompile>
   </ItemGroup>
@@ -116,9 +116,6 @@
     <ClInclude Include="..\unistd.h">
       <Filter>源文件\win_patch</Filter>
     </ClInclude>
-    <ClInclude Include="..\win_io_wait.h">
-      <Filter>源文件\win_patch</Filter>
-    </ClInclude>
     <ClInclude Include="..\arpa\inet.h">
       <Filter>源文件\win_patch\arpa</Filter>
     </ClInclude>
@@ -133,6 +130,9 @@
     </ClInclude>
     <ClInclude Include="..\..\platform_adapter.h">
       <Filter>源文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\io_wait.h">
+      <Filter>源文件\win_patch</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

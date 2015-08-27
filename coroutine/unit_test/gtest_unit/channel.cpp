@@ -271,7 +271,7 @@ TEST(Channel, capacity0Try)
         auto e = system_clock::now();
         auto d = duration_cast<milliseconds>(e - s).count();
         EXPECT_LT(d, 250);
-        EXPECT_GT(d, 199);
+        EXPECT_GT(d, 190);
         EXPECT_EQ(i, 7);
         EXPECT_EQ(wake, 1);
         EXPECT_EQ(pop_done, 2);

@@ -41,7 +41,14 @@ struct TestServer
 
         Accept();
         boost::thread thr([&] {
-            io_service::work worker(ios_); ios_.run(); 
+			while (is_work_) {
+				try {
+					ios_.run();
+				}
+				catch (...) {
+					return;
+				}
+			}
         });
 
         work_thread_.swap(thr);
@@ -50,7 +57,7 @@ struct TestServer
     ~TestServer()
     {
         is_work_ = false;
-//        work_thread_.join();
+		work_thread_.interrupt();
     }
 
     void Accept()
