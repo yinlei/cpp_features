@@ -44,6 +44,7 @@ public:
     typedef std::multimap<TimePoint, CoTimerPtr> DeadLines;
 
     CoTimerMgr();
+	~CoTimerMgr();
 
     CoTimerPtr ExpireAt(TimePoint const& time_point, CoTimer::fn_t const& fn);
 

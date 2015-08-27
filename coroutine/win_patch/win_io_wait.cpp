@@ -16,6 +16,10 @@ void IoWait::SchedulerSwitch(Task* tk)
 
 int IoWait::WaitLoop()
 {
+	Task::DeleteList delete_list;
+	Task::SwapDeleteList(delete_list);
+	for (auto tk : delete_list)
+		delete tk;
     return 0;
 }
 

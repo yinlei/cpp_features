@@ -50,6 +50,11 @@ bool CoTimer::BlockCancel()
 CoTimerMgr::CoTimerMgr()
 {}
 
+CoTimerMgr::~CoTimerMgr()
+{
+
+}
+
 CoTimerPtr CoTimerMgr::ExpireAt(TimePoint const& time_point, CoTimer::fn_t const& fn)
 {
     std::unique_lock<LFLock> lock(lock_);
