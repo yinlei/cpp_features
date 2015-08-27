@@ -1,0 +1,3 @@
+[submodule "coroutine/win_patch/mhook"]
+	path = coroutine/win_patch/mhook
+	url = https://github.com/yyzybb537/mhook.git
