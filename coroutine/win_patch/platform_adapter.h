@@ -2,9 +2,11 @@
 
 namespace co {
 
+	struct ThreadLocalInfo;
 	struct ProcesserRunGuard
 	{
-		ProcesserRunGuard();
+		ThreadLocalInfo *info_;
+		ProcesserRunGuard(ThreadLocalInfo &info);
 		~ProcesserRunGuard();
 	};
 

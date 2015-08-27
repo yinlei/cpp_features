@@ -29,6 +29,9 @@ std::string co_error_category::message(int v) const
 
         case (int)eCoErrorCode::ec_swapcontext_failed:
             return "swapcontext failed";
+
+		case (int)eCoErrorCode::ec_makecontext_failed:
+			return "makecontext failed";
     }
 
     return "";

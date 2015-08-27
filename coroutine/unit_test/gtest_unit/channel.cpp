@@ -55,7 +55,7 @@ TEST(Channel, capacity0)
     int k = 0;
     std::atomic<int> total{0};
     int total_check = 0;
-    for (k = 0; k < 10000; ++k) {
+    for (k = 0; k < 100; ++k) {
         total_check += k;
         go [=]{ ch << k; };
         go [&]{ short v; ch >> v; total += v; };

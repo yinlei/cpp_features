@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string.h>
 #include <string>
+#include <algorithm>
 #include "scheduler.h"
 
 namespace co
@@ -85,12 +86,14 @@ void Task::AddIntoProcesser(Processer *proc, char* shared_stack, uint32_t shared
     ctx_.uc_link = NULL;
     makecontext(&ctx_, (void(*)(void))&C_func, 1, this);
 
+#ifndef CO_USE_WINDOWS_FIBER
     // save coroutine stack first 16 bytes.
     assert(!stack_);
     stack_size_ = 16;
     stack_capacity_ = std::max<uint32_t>(16, g_Scheduler.GetOptions().init_stack_size);
     stack_ = (char*)malloc(stack_capacity_);
     memcpy(stack_, shared_stack + shared_stack_cap - stack_size_, stack_size_);
+#endif
 
     state_ = TaskState::runnable;
 }

@@ -1,17 +1,19 @@
 #include "platform_adapter.h"
 #include <windows.h>
+#include "scheduler.h"
 
 namespace co {
 
 
-	ProcesserRunGuard::ProcesserRunGuard()
+	ProcesserRunGuard::ProcesserRunGuard(ThreadLocalInfo &info) : info_(&info)
 	{
-		ConvertThreadToFiber(NULL);
+		info_->scheduler.native = ConvertThreadToFiber(NULL);
 	}
 
 	ProcesserRunGuard::~ProcesserRunGuard()
 	{
 		ConvertFiberToThread();
+		info_->scheduler.native = NULL;
 	}
 
 } //namespace co

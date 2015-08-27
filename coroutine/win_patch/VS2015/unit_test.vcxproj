@@ -154,7 +154,6 @@
     <ClCompile Include="..\..\unit_test\gtest_unit\channel.cpp" />
     <ClCompile Include="..\..\unit_test\gtest_unit\exception.cpp" />
     <ClCompile Include="..\..\unit_test\gtest_unit\mass_co.cpp" />
-    <ClCompile Include="..\..\unit_test\gtest_unit\select.cpp" />
     <ClCompile Include="..\..\unit_test\gtest_unit\timer.cpp" />
     <ClCompile Include="..\..\unit_test\gtest_unit\ts_queue.cpp" />
   </ItemGroup>

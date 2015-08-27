@@ -1,5 +1,7 @@
 #pragma once
 
+#define CO_USE_WINDOWS_FIBER 1
+
 namespace co {
 
 typedef struct sigaltstack {
@@ -19,14 +21,10 @@ struct ucontext_t
 	~ucontext_t();
 };
 
-extern "C" {
-
 void makecontext(ucontext_t *ucp, void (*func)(), int argc, void* argv);
 
 int swapcontext(ucontext_t *oucp, ucontext_t *ucp);
 
 int getcontext(ucontext_t *ucp);
-
-} //extern "C"
 
 } //namespace co

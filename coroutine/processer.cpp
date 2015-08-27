@@ -43,6 +43,8 @@ void Processer::AddTaskRunnable(Task *tk)
 
 uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
 {
+	ProcesserRunGuard _run_guard(info);
+
     info.current_task = NULL;
     done_count = 0;
     uint32_t c = 0;
@@ -50,8 +52,6 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
     uint32_t do_count = slist.size();
 
     DebugPrint(dbg_scheduler, "Run [Proc(%d) do_count:%u] --------------------------", id_, do_count);
-
-	ProcesserRunGuard _run_guard;
 
     SList<Task>::iterator it = slist.begin();
     for (; it != slist.end(); ++c)
@@ -156,6 +156,7 @@ uint32_t Processer::GetTaskCount()
 
 void Processer::SaveStack(Task *tk)
 {
+#ifndef CO_USE_WINDOWS_FIBER
     char dummy = 0;
     char *top = shared_stack_ + shared_stack_cap_;
     uint32_t current_stack_size = top - &dummy;
@@ -167,12 +168,15 @@ void Processer::SaveStack(Task *tk)
     }
     tk->stack_size_ = current_stack_size;
     memcpy(tk->stack_, &dummy, tk->stack_size_);
+#endif
 }
 
 void Processer::RestoreStack(Task *tk)
 {
+#ifndef CO_USE_WINDOWS_FIBER
     DebugPrint(dbg_scheduler, "task(%s) in proc(%u) restore_stack size=%u", tk->DebugInfo(), id_, tk->stack_size_);
     memcpy(shared_stack_ + shared_stack_cap_ - tk->stack_size_, tk->stack_, tk->stack_size_);
+#endif
 }
 
 } //namespace co

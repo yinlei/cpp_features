@@ -128,11 +128,11 @@
     <ClInclude Include="..\sys\resource.h">
       <Filter>源文件\win_patch\sys</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\platform_adapter.h">
-      <Filter>源文件</Filter>
-    </ClInclude>
     <ClInclude Include="..\platform_adapter.h">
       <Filter>源文件\win_patch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\platform_adapter.h">
+      <Filter>源文件</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

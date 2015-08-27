@@ -24,9 +24,6 @@
     <ClCompile Include="..\..\unit_test\gtest_unit\mass_co.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\unit_test\gtest_unit\select.cpp">
-      <Filter>源文件</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\unit_test\gtest_unit\timer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
