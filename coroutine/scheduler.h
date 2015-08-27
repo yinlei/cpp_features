@@ -112,7 +112,7 @@ class Scheduler
         bool IsEmpty();
 
         // 当前协程让出执行权
-        void Yield();
+        void CoYield();
 
         // 调度器调度函数, 内部执行协程、调度协程
         uint32_t Run();

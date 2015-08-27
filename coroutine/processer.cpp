@@ -2,6 +2,7 @@
 #include "scheduler.h"
 #include "error.h"
 #include "assert.h"
+#include "platform_adapter.h"
 
 namespace co {
 
@@ -49,6 +50,8 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
     uint32_t do_count = slist.size();
 
     DebugPrint(dbg_scheduler, "Run [Proc(%d) do_count:%u] --------------------------", id_, do_count);
+
+	ProcesserRunGuard _run_guard;
 
     SList<Task>::iterator it = slist.begin();
     for (; it != slist.end(); ++c)
@@ -131,7 +134,7 @@ uint32_t Processer::Run(ThreadLocalInfo &info, uint32_t &done_count)
     return c;
 }
 
-void Processer::Yield(ThreadLocalInfo &info)
+void Processer::CoYield(ThreadLocalInfo &info)
 {
     Task *tk = info.current_task;
     if (!tk) return ;

@@ -1,29 +1,35 @@
 #include "ucontext.h"
+#include <Windows.h>
 
 namespace co {
+	
+ucontext_t::~ucontext_t()
+{
+	if (native) {
+		DeleteFiber(native);
+		native = NULL;
+	}
+}
 
 extern "C" {
 
+static VOID WINAPI FiberFunc(LPVOID param)
+{
+	ucontext_t *ucp = (ucontext_t*)param;
+	ucp->fn(ucp->arg);
+}
+
 void makecontext(ucontext_t *ucp, void (*func)(), int argc, void* argv)
 {
-    ucp->arg = argv;
-#ifdef OLD_BOOST_CONTEXT
-    ucp->native = ::boost::context::make_fcontext(ucp->uc_stack.ss_sp,
-            ucp->uc_stack.ss_size, (void(*)(intptr_t))func);
-#else
-    ucp->native = ::boost::context::make_fcontext(
-        (char*)ucp->uc_stack.ss_sp + ucp->uc_stack.ss_size,
-        ucp->uc_stack.ss_size, (void(*)(intptr_t))func);
-#endif
+	ucp->fn = (void(*)(void*))func;
+	ucp->arg = argv;
+	ucp->native = CreateFiberEx(1024, ucp->uc_stack.ss_size, FIBER_FLAG_FLOAT_SWITCH, (LPFIBER_START_ROUTINE)FiberFunc, ucp);
 }
 
 int swapcontext(ucontext_t *oucp, ucontext_t *ucp)
 {
-#ifdef OLD_BOOST_CONTEXT
-    ::boost::context::jump_fcontext(oucp->native, ucp->native, (intptr_t)ucp->arg);
-#else
-    ::boost::context::jump_fcontext(&oucp->native, ucp->native, (intptr_t)ucp->arg);
-#endif
+	oucp->native = GetFiberData();
+	SwitchToFiber(ucp->native);
     return 0;
 }
 

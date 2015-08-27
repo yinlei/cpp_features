@@ -148,6 +148,7 @@
     <ClCompile Include="..\..\task.cpp" />
     <ClCompile Include="..\..\thread_pool.cpp" />
     <ClCompile Include="..\..\timer.cpp" />
+    <ClCompile Include="..\platform_adapter.cpp" />
     <ClCompile Include="..\ucontext.cpp" />
     <ClCompile Include="..\win_io_wait.cpp" />
     <ClCompile Include="..\win_vc_hook.cpp" />
@@ -158,6 +159,7 @@
     <ClInclude Include="..\..\coroutine.h" />
     <ClInclude Include="..\..\co_mutex.h" />
     <ClInclude Include="..\..\error.h" />
+    <ClInclude Include="..\..\platform_adapter.h" />
     <ClInclude Include="..\..\processer.h" />
     <ClInclude Include="..\..\scheduler.h" />
     <ClInclude Include="..\..\sleep_wait.h" />
@@ -167,6 +169,7 @@
     <ClInclude Include="..\..\timer.h" />
     <ClInclude Include="..\..\ts_queue.h" />
     <ClInclude Include="..\arpa\inet.h" />
+    <ClInclude Include="..\platform_adapter.h" />
     <ClInclude Include="..\sys\epoll.h" />
     <ClInclude Include="..\sys\resource.h" />
     <ClInclude Include="..\sys\socket.h" />

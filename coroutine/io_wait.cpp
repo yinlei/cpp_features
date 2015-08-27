@@ -42,7 +42,7 @@ void IoWait::CoSwitch(std::vector<FdStruct> && fdsts, int timeout_ms)
 
     DebugPrint(dbg_ioblock, "task(%s) CoSwitch id=%d, nfds=%d, timeout=%d",
             tk->DebugInfo(), id, (int)fdsts.size(), timeout_ms);
-    g_Scheduler.Yield();
+    g_Scheduler.CoYield();
 }
 
 void IoWait::SchedulerSwitch(Task* tk)

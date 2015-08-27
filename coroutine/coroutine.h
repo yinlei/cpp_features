@@ -72,7 +72,7 @@ struct __async_wait<void>
 } //namespace co
 
 #define go ::co::__go()-
-#define co_yield do { g_Scheduler.Yield(); } while (0)
+#define co_yield do { g_Scheduler.CoYield(); } while (0)
 
 // (uint32_t type, uint64_t id)
 #define co_wait(type, id) do { g_Scheduler.UserBlockWait(type, id); } while (0)

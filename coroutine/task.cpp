@@ -51,7 +51,7 @@ static void C_func(Task* self)
     }
 
     self->state_ = TaskState::done;
-    Scheduler::getInstance().Yield();
+    Scheduler::getInstance().CoYield();
 }
 
 Task::Task(TaskF const& fn)

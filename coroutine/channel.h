@@ -141,7 +141,7 @@ private:
                 if (write_block_.TryBlockWait())
                     return false;
                 else
-                    g_Scheduler.Yield();
+                    g_Scheduler.CoYield();
 
             {
                 std::unique_lock<CoMutex> lock(queue_lock_);
@@ -159,7 +159,7 @@ private:
                 if (write_block_.TryBlockWait())
                     return false;
                 else
-                    g_Scheduler.Yield();
+                    g_Scheduler.CoYield();
 
             {
                 std::unique_lock<CoMutex> lock(queue_lock_);
@@ -257,7 +257,7 @@ private:
                 if (write_block_.TryBlockWait())
                     return false;
                 else
-                    g_Scheduler.Yield();
+                    g_Scheduler.CoYield();
 
             return true;
         }

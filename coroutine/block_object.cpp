@@ -42,7 +42,7 @@ void BlockObject::CoBlockWait()
     tk->state_ = TaskState::sys_block;
     lock.unlock();
     DebugPrint(dbg_syncblock, "wait to switch. task(%s)", tk->DebugInfo());
-    g_Scheduler.Yield();
+    g_Scheduler.CoYield();
 }
 
 bool BlockObject::TryBlockWait()

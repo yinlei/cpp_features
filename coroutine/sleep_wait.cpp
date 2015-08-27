@@ -15,7 +15,7 @@ void SleepWait::CoSwitch(int timeout_ms)
     tk->state_ = TaskState::sleep;
 
     DebugPrint(dbg_sleepblock, "task(%s) will sleep %d ms", tk->DebugInfo(), tk->sleep_ms_);
-    g_Scheduler.Yield();
+    g_Scheduler.CoYield();
 }
 
 void SleepWait::SchedulerSwitch(Task* tk)
