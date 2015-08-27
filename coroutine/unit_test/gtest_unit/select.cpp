@@ -215,7 +215,8 @@ TEST(Select, Sleep)
 
 TEST(Select, MultiThreads)
 {
-    for (int i = 0; i < 100; ++i)
+//    co_sched.GetOptions().debug = co::dbg_hook;
+    for (int i = 0; i < 50; ++i)
         go [] {
             fd_set rd_fds;
             auto r = CreateFds(&rd_fds, 2);
