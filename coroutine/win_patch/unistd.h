@@ -1,5 +1,7 @@
 #pragma once
-#include <boost/asio.hpp>
+#include <WinSock2.h>
+#include <Windows.h>
+#include <stdint.h>
 
 inline void usleep(uint64_t microseconds)
 {

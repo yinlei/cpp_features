@@ -14,6 +14,7 @@ enum class eCoErrorCode : int
     ec_yield_failed,
     ec_swapcontext_failed,
 	ec_makecontext_failed,
+    ec_iocpinit_failed,
 };
 
 class co_error_category

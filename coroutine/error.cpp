@@ -32,6 +32,9 @@ std::string co_error_category::message(int v) const
 
 		case (int)eCoErrorCode::ec_makecontext_failed:
 			return "makecontext failed";
+
+        case (int)eCoErrorCode::ec_iocpinit_failed:
+            return "iocp init failed";
     }
 
     return "";

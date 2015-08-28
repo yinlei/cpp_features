@@ -1,5 +1,4 @@
 #include "platform_adapter.h"
-#include <windows.h>
 #include "scheduler.h"
 
 namespace co {

@@ -1,8 +1,12 @@
 #include "io_wait.h"
+#include "error.h"
 
 namespace co {
 
-IoWait::IoWait() {}
+IoWait::IoWait() 
+{
+
+}
 
 void IoWait::CoSwitch(std::vector<FdStruct> && fdsts, int timeout_ms)
 {

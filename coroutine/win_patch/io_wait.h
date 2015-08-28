@@ -1,4 +1,5 @@
 #pragma once
+#include <unistd.h>
 #include <vector>
 #include <list>
 #include <set>
@@ -22,13 +23,6 @@ namespace co
 
     private:
         void Cancel(Task *tk, uint32_t id);
-        
-        std::list<CoTimerPtr> timeout_list_;
-        LFLock timeout_list_lock_;
-        CoTimerMgr timer_mgr_;
-
-        typedef TSQueue<Task> TaskList;
-        TaskList wait_tasks_;
     };
 
 
