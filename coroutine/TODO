@@ -1,5 +1,6 @@
 TODO:
 WIN HOOK: send recv WSARecv** WSASend**
+优化计时器性能(由于Windows版严重依赖定时器, 因此需要优化)
 HOOK select poll时, 正确处理文件句柄
 
 DONE:

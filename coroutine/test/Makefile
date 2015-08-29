@@ -10,7 +10,7 @@ pg_cpu.t: pg_cpu.o
 	@echo "LD $@"
 
 pg_cpu.o: cpu.cpp
-	@$(CC) $(CFLAGS) -pg -c $^ -I.. -o $@
+	@$(CC) $(CFLAGS) -pg -c $^ -I.. -I../linux -o $@
 	@echo "MK $@"
 
 s_hiredis.t: hiredis.o
@@ -26,7 +26,7 @@ hiredis.t: hiredis.o
 	@echo "LD $@"
 
 .cpp.o:
-	@$(CC) $(CFLAGS) -c $^ -I.. -o $@
+	@$(CC) $(CFLAGS) -c $^ -I.. -I../linux -o $@
 	@echo "MK $@"
 
 .PHONY: clean

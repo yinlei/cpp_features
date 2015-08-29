@@ -20,13 +20,19 @@ using ::boost::system::error_code;
 
 struct TestServer
 {
-    io_service ios_;
+    io_service &ios_;
     tcp::acceptor *accept_ = NULL;
     bool is_work_;
     boost::thread work_thread_;
     int count_ = 0;
 
-    TestServer() : is_work_(true)
+    static io_service& get_io_service()
+    {
+        static io_service ios;
+        return ios;
+    }
+
+    TestServer() : ios_(get_io_service()), is_work_(true)
     {
 #ifndef WINNT
         rlimit of = {4096, 4096};
@@ -59,7 +65,7 @@ struct TestServer
         is_work_ = false;
         error_code ignore_ec;
         accept_->close(ignore_ec);
-		work_thread_.join();
+        work_thread_.interrupt();
     }
 
     void Accept()
