@@ -1,4 +1,5 @@
 TODO:
+select中对exceptfds正确检测!
 移植Windows: 
     1.HOOK WINAPI, boost.asio替代epoll
         Hook List: recv send select WSARecv WSASend
