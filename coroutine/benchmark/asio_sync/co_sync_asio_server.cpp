@@ -24,7 +24,12 @@ void echo_server()
     std::atomic<int> session_count{0};
     for (;;) {
         std::shared_ptr<tcp::socket> s(new tcp::socket(ios));
-        acc.accept(*s);
+        error_code ec;
+        acc.accept(*s, ec);
+        if (ec) {
+            printf("accept exception %d:%s\n", ec.value(), ec.message().c_str());
+            continue;
+        }
         go [&session_count, s]{
             tcp::endpoint addr = s->remote_endpoint();
             ++session_count;

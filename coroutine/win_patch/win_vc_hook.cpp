@@ -219,7 +219,7 @@ namespace co {
         R ret = fn(s, std::forward<Args>(args)...);
         if (ret != -1 && ret >= 0) {
             SetNonblocking(s, false);
-            return 0;
+            return ret;
         }
 
         // If connection is closed, the Bytes will setted 0, and ret is 0, and WSAGetLastError() returns 0.
