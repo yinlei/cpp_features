@@ -33,18 +33,41 @@ coroutine有以下特点：
       email:289633152@qq.com
 
  *   coroutine/samples目录下有很多示例代码，内含详细的使用说明，让用户可以循序渐进的学习coroutine库的使用方法。
+ 
+##### 编译与使用:
+ *    Linux: 
+ 
+        1.进入coroutine目录，执行make && sudo make install即可编译并安装完成.
 
-##### coroutine库的链接方法：
-     * 动态链接时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
-       g++ -std=c++11 test.cpp -lcoroutine -ldl [-lother_libs]
-     * 静态链接时，只需链接libcoroutine.a即可，不要求第一个被链接，但要求libc.a最后被链接. 例如:
-       g++ -std=c++11 test.cpp -lcoroutine -static -static-libgcc -static-libstdc++
+        2.动态链接时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
+        
+            g++ -std=c++11 test.cpp -lcoroutine -ldl [-lother_libs]
+            
+        3.静态链接时，只需链接libcoroutine.a即可，不要求第一个被链接，但要求libc.a最后被链接. 例如:
+        
+            g++ -std=c++11 test.cpp -lcoroutine -static -static-libgcc -static-libstdc++
+
+ *    Windows: 
+ 
+        1.使用git submodule update --init下载子模块
+
+        2.自行安装并编译Boost库
+        
+        3.进入coroutine/win_patch/VS2015目录, 使用VS2015打开coroutine.sln
+        
+        4.编译coroutine项目（默认的工程配置暂时只配置了x64-Debug-mt版，需要其他版本请自行修改工程配置）
+        
+        5.使用时需要添加两个头文件包含目录：coroutine和coroutine/win_patch
 
 ##### 注意事项：
      * 1.使用多线程调度时，协程的每次切换，下一次继续执行都可能处于其他线程中，因此不能使用<线程局部变量>
      * 2.协程的调度是协作式调度，需要协程主动让出执行权，因此不要让一个代码段耗时过长，
          在耗时很多的循环中插入一些yield是一个很棒的选择
      * 3.除网络IO以外的阻塞系统调用，会真正阻塞调度线程的运行，请使用channel+线程池的策略处理.
+
+
+
+
 
 
 ### multiret   - 让C++支持多返回值
