@@ -17,10 +17,47 @@ namespace co {
         )
     {
         int ret = ioctlsocket_f(s, cmd, argp);
+        int err = WSAGetLastError();
         if (ret == 0 && cmd == FIONBIO) {
             int v = *argp;
             setsockopt(s, SOL_SOCKET, SO_GROUP_PRIORITY, (const char*)&v, sizeof(v));
         }
+        WSASetLastError(err);
+        return ret;
+    }
+
+    typedef int (*WSAIoctl_t)(
+        _In_  SOCKET                             s,
+        _In_  DWORD                              dwIoControlCode,
+        _In_  LPVOID                             lpvInBuffer,
+        _In_  DWORD                              cbInBuffer,
+        _Out_ LPVOID                             lpvOutBuffer,
+        _In_  DWORD                              cbOutBuffer,
+        _Out_ LPDWORD                            lpcbBytesReturned,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
+    static WSAIoctl_t WSAIoctl_f = (WSAIoctl_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSAIoctl");
+
+    static int hook_WSAIoctl(
+        _In_  SOCKET                             s,
+        _In_  DWORD                              dwIoControlCode,
+        _In_  LPVOID                             lpvInBuffer,
+        _In_  DWORD                              cbInBuffer,
+        _Out_ LPVOID                             lpvOutBuffer,
+        _In_  DWORD                              cbOutBuffer,
+        _Out_ LPDWORD                            lpcbBytesReturned,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        )
+    {
+        int ret = WSAIoctl_f(s, dwIoControlCode, lpvInBuffer, cbInBuffer, lpvOutBuffer, cbOutBuffer, lpcbBytesReturned, lpOverlapped, lpCompletionRoutine);
+        //int err = WSAGetLastError();
+        //if (ret == 0 && cmd == FIONBIO) {
+        //    int v = *argp;
+        //    setsockopt(s, SOL_SOCKET, SO_GROUP_PRIORITY, (const char*)&v, sizeof(v));
+        //}
+        //WSASetLastError(err);
         return ret;
     }
 
@@ -142,30 +179,21 @@ namespace co {
         return 0;
     }
 
-    typedef int (*connect_t)(
-        _In_ SOCKET                s,
-        _In_ const struct sockaddr *name,
-        _In_ int                   namelen
-        );
-    static connect_t connect_f = (connect_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "connect");
-
-    static int hook_connect(
-        _In_ SOCKET                s,
-        _In_ const struct sockaddr *name,
-        _In_ int                   namelen
-        )
+    template <typename OriginF, typename ... Args>
+    static int connect_mode_hook(OriginF fn, const char* fn_name, SOCKET s, Args && ... args)
     {
         Task *tk = g_Scheduler.GetCurrentTask();
         bool is_nonblocking = IsNonblocking(s);
-        DebugPrint(dbg_hook, "task(%s) Hook connect(s=%d)(nonblocking:%d).", tk ? tk->DebugInfo() : "nil", (int)s, (int)is_nonblocking);
+        DebugPrint(dbg_hook, "task(%s) Hook %s(s=%d)(nonblocking:%d).", 
+            tk ? tk->DebugInfo() : "nil", fn_name, (int)s, (int)is_nonblocking);
         if (!tk || is_nonblocking)
-            return connect_f(s, name, namelen);
+            return fn(s, std::forward<Args>(args)...);
 
         // async connect
         if (!SetNonblocking(s, true))
-            return connect_f(s, name, namelen);
-        
-        int ret = connect_f(s, name, namelen);
+            return fn(s, std::forward<Args>(args)...);
+
+        int ret = fn(s, std::forward<Args>(args)...);
         if (ret == 0) return 0;
 
         int err = WSAGetLastError();
@@ -196,10 +224,50 @@ namespace co {
         return 0;
     }
 
+    typedef int (*connect_t)(
+        _In_ SOCKET                s,
+        _In_ const struct sockaddr *name,
+        _In_ int                   namelen
+        );
+    static connect_t connect_f = (connect_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "connect");
+
+    static int hook_connect(
+        _In_ SOCKET                s,
+        _In_ const struct sockaddr *name,
+        _In_ int                   namelen
+        )
+    {
+        return connect_mode_hook(connect_f, "connect", s, name, namelen);
+    }
+
+    typedef int (*WSAConnect_t)(
+        _In_  SOCKET                s,
+        _In_  const struct sockaddr *name,
+        _In_  int                   namelen,
+        _In_  LPWSABUF              lpCallerData,
+        _Out_ LPWSABUF              lpCalleeData,
+        _In_  LPQOS                 lpSQOS,
+        _In_  LPQOS                 lpGQOS
+        );
+    static WSAConnect_t WSAConnect_f = (WSAConnect_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSAConnect");
+
+    static int hook_WSAConnect(
+        _In_  SOCKET                s,
+        _In_  const struct sockaddr *name,
+        _In_  int                   namelen,
+        _In_  LPWSABUF              lpCallerData,
+        _Out_ LPWSABUF              lpCalleeData,
+        _In_  LPQOS                 lpSQOS,
+        _In_  LPQOS                 lpGQOS
+        )
+    {
+        return connect_mode_hook(WSAConnect_f, "WSAConnect", s, name, namelen, lpCallerData, lpCalleeData, lpSQOS, lpGQOS);
+    }
+
     enum e_mode_hook_flags
     {
-        e_overlapped = 0x1,
-        e_no_timeout = 0x1 << 1,
+        e_nonblocking_op    = 0x1,
+        e_no_timeout        = 0x1 << 1,
     };
 
     template <typename R, typename OriginF, typename ... Args>
@@ -209,7 +277,7 @@ namespace co {
         bool is_nonblocking = IsNonblocking(s);
         DebugPrint(dbg_hook, "task(%s) Hook %s(s=%d)(nonblocking:%d)(flags:%d).",
             tk ? tk->DebugInfo() : "nil", fn_name, (int)s, (int)is_nonblocking, (int)flags);
-        if (!tk || is_nonblocking || (flags & e_overlapped))
+        if (!tk || is_nonblocking || (flags & e_nonblocking_op))
             return fn(s, std::forward<Args>(args)...);
 
         // async WSARecv
@@ -217,7 +285,7 @@ namespace co {
             return fn(s, std::forward<Args>(args)...);
 
         R ret = fn(s, std::forward<Args>(args)...);
-        if (ret != -1 && ret >= 0) {
+        if (ret != -1) {    // accept返回SOCKET类型，是无符号整数，所以此处不可判断小于0.
             SetNonblocking(s, false);
             return ret;
         }
@@ -266,6 +334,26 @@ namespace co {
         return read_mode_hook<SOCKET>(accept_f, "accept", e_no_timeout, s, addr, addrlen);
     }
 
+    typedef SOCKET (*WSAAccept_t)(
+        _In_    SOCKET          s,
+        _Out_   struct sockaddr *addr,
+        _Inout_ LPINT           addrlen,
+        _In_    LPCONDITIONPROC lpfnCondition,
+        _In_    DWORD_PTR       dwCallbackData
+        );
+    static WSAAccept_t WSAAccept_f = (WSAAccept_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSAAccept");
+
+    static SOCKET hook_WSAAccept(
+        _In_    SOCKET          s,
+        _Out_   struct sockaddr *addr,
+        _Inout_ LPINT           addrlen,
+        _In_    LPCONDITIONPROC lpfnCondition,
+        _In_    DWORD_PTR       dwCallbackData
+        )
+    {
+        return read_mode_hook<SOCKET>(WSAAccept_f, "WSAAccept", e_no_timeout, s, addr, addrlen, lpfnCondition, dwCallbackData);
+    }
+
     typedef int (*WSARecv_t)(
         _In_    SOCKET                             s,
         _Inout_ LPWSABUF                           lpBuffers,
@@ -287,8 +375,146 @@ namespace co {
         _In_    LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
         )
     {
-        return read_mode_hook<int>(WSARecv_f, "WSARecv", lpOverlapped ? e_overlapped : 0, s,
+        return read_mode_hook<int>(WSARecv_f, "WSARecv", lpOverlapped ? e_nonblocking_op : 0, s,
             lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags, lpOverlapped, lpCompletionRoutine);
+    }
+
+    typedef int (*recv_t)(
+        _In_  SOCKET s,
+        _Out_ char   *buf,
+        _In_  int    len,
+        _In_  int    flags
+        );
+    static recv_t recv_f = (recv_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "recv");
+
+    static int hook_recv(
+        _In_  SOCKET s,
+        _Out_ char   *buf,
+        _In_  int    len,
+        _In_  int    flags
+        )
+    {
+        return read_mode_hook<int>(recv_f, "recv", 0, s, buf, len, flags);
+    }
+
+    typedef int (*recvfrom_t)(
+        _In_        SOCKET          s,
+        _Out_       char            *buf,
+        _In_        int             len,
+        _In_        int             flags,
+        _Out_       struct sockaddr *from,
+        _Inout_opt_ int             *fromlen
+        );
+    static recvfrom_t recvfrom_f = (recvfrom_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "recvfrom");
+
+    static int hook_recvfrom(
+        _In_        SOCKET          s,
+        _Out_       char            *buf,
+        _In_        int             len,
+        _In_        int             flags,
+        _Out_       struct sockaddr *from,
+        _Inout_opt_ int             *fromlen
+        )
+    {
+        return read_mode_hook<int>(recvfrom_f, "recvfrom", 0, s, buf, len, flags, from, fromlen);
+    }
+
+    typedef int (*WSARecvFrom_t)(
+        _In_    SOCKET                             s,
+        _Inout_ LPWSABUF                           lpBuffers,
+        _In_    DWORD                              dwBufferCount,
+        _Out_   LPDWORD                            lpNumberOfBytesRecvd,
+        _Inout_ LPDWORD                            lpFlags,
+        _Out_   struct sockaddr                    *lpFrom,
+        _Inout_ LPINT                              lpFromlen,
+        _In_    LPWSAOVERLAPPED                    lpOverlapped,
+        _In_    LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
+    static WSARecvFrom_t WSARecvFrom_f = (WSARecvFrom_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSARecvFrom");
+
+    static int hook_WSARecvFrom(
+        _In_    SOCKET                             s,
+        _Inout_ LPWSABUF                           lpBuffers,
+        _In_    DWORD                              dwBufferCount,
+        _Out_   LPDWORD                            lpNumberOfBytesRecvd,
+        _Inout_ LPDWORD                            lpFlags,
+        _Out_   struct sockaddr                    *lpFrom,
+        _Inout_ LPINT                              lpFromlen,
+        _In_    LPWSAOVERLAPPED                    lpOverlapped,
+        _In_    LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        )
+    {
+        return read_mode_hook<int>(WSARecvFrom_f, "WSARecvFrom", lpOverlapped ? e_nonblocking_op : 0,
+            s, lpBuffers, dwBufferCount, lpNumberOfBytesRecvd, lpFlags, lpFrom, lpFromlen, lpOverlapped, lpCompletionRoutine);
+    }
+
+    typedef int (*WSARecvMsg_t)(
+        _In_    SOCKET                             s,
+        _Inout_ LPWSAMSG                           lpMsg,
+        _Out_   LPDWORD                            lpdwNumberOfBytesRecvd,
+        _In_    LPWSAOVERLAPPED                    lpOverlapped,
+        _In_    LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
+    static WSARecvMsg_t WSARecvMsg_f = (WSARecvMsg_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSARecvMsg");
+
+    static int hook_WSARecvMsg(
+        _In_    SOCKET                             s,
+        _Inout_ LPWSAMSG                           lpMsg,
+        _Out_   LPDWORD                            lpdwNumberOfBytesRecvd,
+        _In_    LPWSAOVERLAPPED                    lpOverlapped,
+        _In_    LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        )
+    {
+        return read_mode_hook<int>(WSARecvMsg_f, "WSARecvMsg", lpOverlapped ? e_nonblocking_op : 0,
+            s, lpMsg, lpdwNumberOfBytesRecvd, lpOverlapped, lpCompletionRoutine);
+    }
+
+    template <typename R, typename OriginF, typename ... Args>
+    static R write_mode_hook(OriginF fn, const char* fn_name, int flags, SOCKET s, Args && ... args)
+    {
+        Task *tk = g_Scheduler.GetCurrentTask();
+        bool is_nonblocking = IsNonblocking(s);
+        DebugPrint(dbg_hook, "task(%s) Hook %s(s=%d)(nonblocking:%d)(flags:%d).",
+            tk ? tk->DebugInfo() : "nil", fn_name, (int)s, (int)is_nonblocking, (int)flags);
+        if (!tk || is_nonblocking || (flags & e_nonblocking_op))
+            return fn(s, std::forward<Args>(args)...);
+
+        // async WSARecv
+        if (!SetNonblocking(s, true))
+            return fn(s, std::forward<Args>(args)...);
+
+        R ret = fn(s, std::forward<Args>(args)...);
+        if (ret != -1) {
+            SetNonblocking(s, false);
+            return ret;
+        }
+
+        // If connection is closed, the Bytes will setted 0, and ret is 0, and WSAGetLastError() returns 0.
+        int err = WSAGetLastError();
+        if (WSAEWOULDBLOCK != err && WSAEINPROGRESS != err) {
+            SetNonblocking(s, false);
+            WSASetLastError(err);
+            return ret;
+        }
+
+        // wait data arrives.
+        int timeout = 0;
+        if (!(flags & e_no_timeout)) {
+            int timeoutlen = sizeof(timeout);
+            getsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, &timeoutlen);
+        }
+
+        timeval tm{ timeout / 1000, timeout % 1000 * 1000 };
+        fd_set wfds;
+        FD_ZERO(&wfds);
+        FD_SET(s, &wfds);
+        select(1, NULL, &wfds, NULL, timeout ? &tm : NULL);
+
+        ret = fn(s, std::forward<Args>(args)...);
+        err = WSAGetLastError();
+        SetNonblocking(s, false);
+        WSASetLastError(err);
+        return ret;
     }
 
     typedef int (*WSASend_t)(
@@ -312,58 +538,133 @@ namespace co {
         _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
         )
     {
-        Task *tk = g_Scheduler.GetCurrentTask();
-        bool is_nonblocking = IsNonblocking(s);
-        DebugPrint(dbg_hook, "task(%s) Hook WSARecv(s=%d, lpOverlapped=%p)(nonblocking:%d).",
-            tk ? tk->DebugInfo() : "nil", (int)s, lpOverlapped, (int)is_nonblocking);
-        if (!tk || is_nonblocking || lpOverlapped)
-            return WSASend_f(s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
+        return write_mode_hook<int>(WSASend_f, "WSASend", lpOverlapped ? e_nonblocking_op : 0,
+            s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
+    }
 
-        // async WSARecv
-        if (!SetNonblocking(s, true))
-            return WSASend_f(s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
+    typedef int (*send_t)(
+        _In_       SOCKET s,
+        _In_ const char   *buf,
+        _In_       int    len,
+        _In_       int    flags
+        );
+    static send_t send_f = (send_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "send");
 
-        int ret = WSASend_f(s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
-        if (0 == ret) {
-            SetNonblocking(s, false);
-            return 0;
-        }
+    static int hook_send(
+        _In_       SOCKET s,
+        _In_ const char   *buf,
+        _In_       int    len,
+        _In_       int    flags
+        )
+    {
+        return write_mode_hook<int>(send_f, "send", 0, s, buf, len, flags);
+    }
 
-        // If connection is closed, the Bytes will setted 0, and ret is 0, and WSAGetLastError() returns 0.
-        int err = WSAGetLastError();
-        if (WSAEWOULDBLOCK != err) {
-            SetNonblocking(s, false);
-            WSASetLastError(err);
-            return ret;
-        }
+    typedef int (*sendto_t)(
+        _In_       SOCKET                s,
+        _In_ const char                  *buf,
+        _In_       int                   len,
+        _In_       int                   flags,
+        _In_       const struct sockaddr *to,
+        _In_       int                   tolen
+        );
+    static sendto_t sendto_f = (sendto_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "sendto");
 
-        // wait data arrives.
-        int timeout = 0;
-        int timeoutlen = sizeof(timeout);
-        getsockopt(s, SOL_SOCKET, SO_SNDTIMEO, (char*)&timeout, &timeoutlen);
+    static int hook_sendto(
+        _In_       SOCKET                s,
+        _In_ const char                  *buf,
+        _In_       int                   len,
+        _In_       int                   flags,
+        _In_       const struct sockaddr *to,
+        _In_       int                   tolen
+        )
+    {
+        return write_mode_hook<int>(sendto_f, "sendto", 0, s, buf, len, flags, to, tolen);
+    }
 
-        timeval tm{ timeout / 1000, timeout % 1000 * 1000 };
-        fd_set wfds;
-        FD_ZERO(&wfds);
-        FD_SET(s, &wfds);
-        select(1, NULL, &wfds, NULL, timeout ? &tm : NULL);
+    typedef int (*WSASendTo_t)(
+        _In_  SOCKET                             s,
+        _In_  LPWSABUF                           lpBuffers,
+        _In_  DWORD                              dwBufferCount,
+        _Out_ LPDWORD                            lpNumberOfBytesSent,
+        _In_  DWORD                              dwFlags,
+        _In_  const struct sockaddr              *lpTo,
+        _In_  int                                iToLen,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
+    static WSASendTo_t WSASendTo_f = (WSASendTo_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSASendTo");
 
-        ret = WSASend_f(s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpOverlapped, lpCompletionRoutine);
-        err = WSAGetLastError();
-        SetNonblocking(s, false);
-        WSASetLastError(err);
-        return ret;
+    static int hook_WSASendTo(
+        _In_  SOCKET                             s,
+        _In_  LPWSABUF                           lpBuffers,
+        _In_  DWORD                              dwBufferCount,
+        _Out_ LPDWORD                            lpNumberOfBytesSent,
+        _In_  DWORD                              dwFlags,
+        _In_  const struct sockaddr              *lpTo,
+        _In_  int                                iToLen,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        )
+    {
+        return write_mode_hook<int>(WSASendTo_f, "WSASendTo", lpOverlapped ? e_nonblocking_op : 0,
+            s, lpBuffers, dwBufferCount, lpNumberOfBytesSent, dwFlags, lpTo, iToLen, lpOverlapped, lpCompletionRoutine);
+    }
+
+    typedef int (*WSASendMsg_t)(
+        _In_  SOCKET                             s,
+        _In_  LPWSAMSG                           lpMsg,
+        _In_  DWORD                              dwFlags,
+        _Out_ LPDWORD                            lpNumberOfBytesSent,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        );
+    static WSASendMsg_t WSASendMsg_f = (WSASendMsg_t)GetProcAddress(GetModuleHandle(L"Ws2_32.dll"), "WSASendMsg");
+
+    static int hook_WSASendMsg(
+        _In_  SOCKET                             s,
+        _In_  LPWSAMSG                           lpMsg,
+        _In_  DWORD                              dwFlags,
+        _Out_ LPDWORD                            lpNumberOfBytesSent,
+        _In_  LPWSAOVERLAPPED                    lpOverlapped,
+        _In_  LPWSAOVERLAPPED_COMPLETION_ROUTINE lpCompletionRoutine
+        )
+    {
+        return write_mode_hook<int>(WSASendMsg_f, "WSASendMsg", lpOverlapped ? e_nonblocking_op : 0,
+            s, lpMsg, dwFlags, lpNumberOfBytesSent, lpOverlapped, lpCompletionRoutine);
     }
 
     void coroutine_hook_init()
     {
         BOOL ok = true;
-        ok &= Mhook_SetHook((PVOID*)&connect_f, &hook_connect);
+        // ioctlsocket and select functions.
         ok &= Mhook_SetHook((PVOID*)&ioctlsocket_f, &hook_ioctlsocket);
+        //ok &= Mhook_SetHook((PVOID*)&WSAIoctl_f, &hook_WSAIoctl);
         ok &= Mhook_SetHook((PVOID*)&select_f, &hook_select);
-        ok &= Mhook_SetHook((PVOID*)&WSARecv_f, &hook_WSARecv);
-        ok &= Mhook_SetHook((PVOID*)&WSASend_f, &hook_WSASend);
+
+        // connect-like functions
+        ok &= Mhook_SetHook((PVOID*)&connect_f, &hook_connect);
+        ok &= Mhook_SetHook((PVOID*)&WSAConnect_f, &hook_WSAConnect);
+
+        // accept-like functions
         ok &= Mhook_SetHook((PVOID*)&accept_f, &hook_accept);
+        ok &= Mhook_SetHook((PVOID*)&WSAAccept_f, &hook_WSAAccept);
+        
+        // recv-like functions
+        ok &= Mhook_SetHook((PVOID*)&recv_f, &hook_recv);
+        ok &= Mhook_SetHook((PVOID*)&recvfrom_f, &hook_recvfrom);
+        ok &= Mhook_SetHook((PVOID*)&WSARecv_f, &hook_WSARecv);
+        ok &= Mhook_SetHook((PVOID*)&WSARecvFrom_f, &hook_WSARecvFrom);
+        if (WSARecvMsg_f) // This function minimum support os is Windows 8.
+            ok &= Mhook_SetHook((PVOID*)&WSARecvMsg_f, &hook_WSARecvMsg);
+
+        // send-like functions
+        ok &= Mhook_SetHook((PVOID*)&send_f, &hook_send);
+        ok &= Mhook_SetHook((PVOID*)&sendto_f, &hook_sendto);
+        ok &= Mhook_SetHook((PVOID*)&WSASend_f, &hook_WSASend);
+        ok &= Mhook_SetHook((PVOID*)&WSASendTo_f, &hook_WSASendTo);
+        ok &= Mhook_SetHook((PVOID*)&WSASendMsg_f, &hook_WSASendMsg);
+        
         if (!ok) {
             fprintf(stderr, "Hook failed!");
             exit(1);
