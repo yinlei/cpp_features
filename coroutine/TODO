@@ -1,6 +1,4 @@
 TODO:
-WIN HOOK: send recv WSARecv** WSASend**
-优化计时器性能(由于Windows版严重依赖定时器, 因此需要优化)
 HOOK select poll时, 正确处理文件句柄
 
 DONE:
@@ -26,4 +24,5 @@ select中对exceptfds正确检测!
     1.HOOK WINAPI, 使用多select模型
         Hook List: accept connect select WSARecv WSASend
     2.ucontext->windows.fiber
+WIN HOOK: send recv WSARecv** WSASend**
 
