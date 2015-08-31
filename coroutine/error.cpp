@@ -4,7 +4,7 @@
 namespace co
 {
 
-const char* co_error_category::name() const noexcept
+const char* co_error_category::name() const throw()
 {
     return "coroutine_error";
 }

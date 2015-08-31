@@ -21,7 +21,7 @@ class co_error_category
     : public std::error_category
 {
 public:
-    virtual const char* name() const noexcept;
+    virtual const char* name() const throw();
 
     virtual std::string message(int) const;
 };

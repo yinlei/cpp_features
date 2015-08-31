@@ -93,7 +93,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <AdditionalIncludeDirectories>..;../..;E:\boost_1_59_0;E:\cpp_features\coroutine\win_patch\mhook\mhook-lib;E:\cpp_features\coroutine\win_patch\mhook\disasm-lib</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..;../..;E:\cpp_features\coroutine\win_patch\mhook\mhook-lib;E:\cpp_features\coroutine\win_patch\mhook\disasm-lib</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4819</DisableSpecificWarnings>
     </ClCompile>
     <Link>
