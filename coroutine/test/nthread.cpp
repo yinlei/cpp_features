@@ -9,7 +9,7 @@ using namespace std;
 std::atomic_int g_value{0};
 static const int co_count = 100000;
 static const int switch_per_co = 10;
-static const int thread_count = 2;
+static int thread_count = 2;
 
 void f1()
 {
@@ -20,10 +20,13 @@ void f1()
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
 //    g_Scheduler.GetOptions().debug = dbg_all;
     g_Scheduler.GetOptions().stack_size = 2048;
+
+    if (argc > 1)
+        thread_count = atoi(argv[1]);
 
     for (int i = 0; i < co_count; ++i) {
         go f1;
