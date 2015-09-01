@@ -49,7 +49,7 @@ void server()
     ret = bind(accept_fd, (sockaddr*)&addr, sizeof(addr));
     assert(ret == 0);
 
-    ret = listen(accept_fd, 100);
+    ret = listen(accept_fd, 8192);
     assert(ret == 0);
     for (;;)
     {
@@ -70,12 +70,18 @@ void server()
                 timeval tv{rcv_timeo, 0};
                 setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 retry_read:
+                //printf("enter ::read\n");
                 ssize_t rn = ::read(s, rbuf + rpos, sizeof(rbuf) - rpos);
+                //printf("leave ::read\n");
                 if (rn < 0) {
                     if (errno == EINTR)
                         goto retry_read;
 
                     //printf("read error %d:%s\n", errno, strerror(errno));
+                    close(s);
+                    return ;
+                }
+                if (rn == 0) {
                     close(s);
                     return ;
                 }
@@ -133,12 +139,11 @@ int main(int argc, char **argv)
     if (argc > 1)
         thread_count = atoi(argv[1]);
 
-//    rlimit of = {1000000, 1000000};
-//    rlimit of = {RLIM_INFINITY, RLIM_INFINITY};
-//    if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {
-//        perror("setrlimit");
-//        exit(1);
-//    }
+    rlimit of = {1000000, 1000000};
+    if (-1 == setrlimit(RLIMIT_NOFILE, &of)) {
+        perror("setrlimit");
+        exit(1);
+    }
 
     go server;
 
