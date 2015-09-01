@@ -1,5 +1,7 @@
 #pragma once
 
+#define co_thread_local thread_local
+
 namespace co {
 
 	struct ThreadLocalInfo;

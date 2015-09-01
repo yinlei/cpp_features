@@ -5,6 +5,7 @@
 #include <system_error>
 #include <unistd.h>
 #include "thread_pool.h"
+#include "platform_adapter.h"
 
 namespace co
 {
@@ -29,7 +30,7 @@ Scheduler::~Scheduler()
 
 ThreadLocalInfo& Scheduler::GetLocalInfo()
 {
-    static thread_local ThreadLocalInfo *info = NULL;
+    static co_thread_local ThreadLocalInfo *info = NULL;
     if (!info)
         info = new ThreadLocalInfo();
 
