@@ -118,15 +118,17 @@ int main(int argc, char **argv)
 {
     if (argc > 1) 
         if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
-            printf("\n    Usage: %s [ThreadCount] [ClientCount]\n", argv[0]);
-            printf("\n    Default: %s 4 50000\n", argv[0]);
+            printf("\n    Usage: %s [ip] [ThreadCount] [ClientCount]\n", argv[0]);
+            printf("\n    Default: %s 127.0.0.1 4 50000\n", argv[0]);
             exit(1);
         }
 
     if (argc > 1)
-        thread_count = atoi(argv[1]);
+        g_ip = argv[1];
     if (argc > 2)
-        client_count = atoi(argv[2]);
+        thread_count = atoi(argv[2]);
+    if (argc > 3)
+        client_count = atoi(argv[3]);
 
     rlimit of = {100000, 100000};
 //    rlimit of = {RLIM_INFINITY, RLIM_INFINITY};

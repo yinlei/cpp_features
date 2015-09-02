@@ -40,7 +40,7 @@ void server()
 
     int v = 1;
     ret = setsockopt(accept_fd, SOL_SOCKET, SO_REUSEPORT, &v, sizeof(v));
-    assert(ret == 0);
+//    assert(ret == 0);
 
     sockaddr_in addr;
     addr.sin_family = AF_INET;
