@@ -188,6 +188,7 @@ retry:
             // 将tk暂存, 最后再执行Cancel, 是为了poll和select可以得到正确的计数。
             // 以防Task被加入runnable列表后，被其他线程执行
             epollwait_tasks_.insert(EpollWaitSt{tk, ep->io_block_id});
+            DebugPrint(dbg_ioblock, "task(%s) epoll trigger io_block_id(%u)", tk->DebugInfo(), ep->io_block_id);
         }
     }
 

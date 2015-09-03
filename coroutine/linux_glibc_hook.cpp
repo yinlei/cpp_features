@@ -36,6 +36,7 @@ static ssize_t read_write_mode(int fd, OriginF fn, const char* hook_fn_name, uin
     if (-1 == fcntl(fd, F_SETFL, flags | O_NONBLOCK))
         return fn(fd, std::forward<Args>(args)...);
 
+    DebugPrint(dbg_hook, "task(%s) real hook %s fd=%d", tk->DebugInfo(), hook_fn_name, fd);
     ssize_t n = fn(fd, std::forward<Args>(args)...);
     if (n == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         // get timeout option.
