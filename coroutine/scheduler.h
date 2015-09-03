@@ -62,11 +62,13 @@ struct CoroutineOptions
     eCoExHandle exception_handle = eCoExHandle::immedaitely_throw;
 
     // 协程栈大小上限, 只会影响在此值设置之后新创建的P, 建议在首次Run前设置.
+    // @仅在Linux生效.
     uint32_t stack_size = 2 * 1024 * 1024; 
 
     // 初始协程栈大小, 此值越小, 对内存消耗越少, 但不会低于16bytes.
     //    设置一个恰当的初始栈大小, 可以避免栈内存重分配, 提高性能, 但可能会浪费一部分内存.
     //    这个值只是用来保存栈内存的内存块初始大小, 即使设置的很大, 栈大小也不会超过stack_size
+    // @仅在Linux生效.
     uint32_t init_stack_size = 512; 
 
     // P的数量, 首次Run时创建所有P, 随后只能增加新的P不能减少现有的P
@@ -142,10 +144,6 @@ class Scheduler
         uint32_t GetCurrentThreadID();
 
     public:
-        /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
-        void IOBlockSwitch(int fd, uint32_t event, int timeout_ms);
-        void IOBlockSwitch(std::vector<FdStruct> && fdsts, int timeout_ms);
-
         /// sleep switch
         //  \timeout_ms min value is 0.
         void SleepSwitch(int timeout_ms);
@@ -190,6 +188,10 @@ class Scheduler
     public:
         Task* GetCurrentTask();
 
+        /// 调用阻塞式网络IO时, 将当前协程加入等待队列中, socket加入epoll中.
+        void IOBlockSwitch(int fd, uint32_t event, int timeout_ms);
+        void IOBlockSwitch(std::vector<FdStruct> && fdsts, int timeout_ms);
+
     private:
         Scheduler();
         ~Scheduler();
@@ -201,12 +203,6 @@ class Scheduler
 
         // 将一个协程加入可执行队列中
         void AddTaskRunnable(Task* tk);
-
-        // 将一个协程等待的fd全部加入epoll中
-        bool __IOBlockSwitch(Task* tk);
-
-        // 取消一个协程的IOBlock
-        void __IOBlockCancel(Task* tk);
 
         /// ------------------------------------------------------------------------
         // 协程框架定义的阻塞切换, type范围不可与用户自定义范围重叠, 指定为:[-xxxxx, -1]

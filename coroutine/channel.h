@@ -218,7 +218,6 @@ private:
     {
         BlockObject write_block_;
         BlockObject read_block_;
-        CoMutex queue_lock_;
 
     public:
         explicit ChannelImpl(std::size_t capacity)
