@@ -1,13 +1,15 @@
 #include <iostream>
 #include <unistd.h>
 #include <coroutine/coroutine.h>
-#include "transport.h"
+#include "network.h"
 using namespace std;
 using namespace co;
 using namespace network;
 
 int main()
 {
+    co_sched.GetOptions().debug = network::dbg_session_alive;
+
     TcpServer server;
     server.SetConnectedCb([](SessionId id){
         printf("connected.\n");

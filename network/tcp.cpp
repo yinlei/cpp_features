@@ -1,17 +1,20 @@
-#include "transport.h"
+#include "tcp.h"
 #include <chrono>
+#include <boost/bind.hpp>
 
 namespace network {
 
-TcpSession::TcpSession(shared_ptr<tcp::socket> s,
-        TcpServer* server)
-    : socket_(s), recv_buf_(4096), server_(server),
-    shutdown_ref_{2}
+TcpSession::TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder)
+    : socket_(s), holder_(holder), recv_buf_(4096), send_msg_cond_(1), shutdown_ref_{2}
 {
+    local_addr_ = s->local_endpoint();
+    remote_addr_ = s->remote_endpoint();
 }
 
 TcpSession::~TcpSession()
 {
+    DebugPrint(dbg_session_alive, "TcpSession destruct %s:%d",
+            remote_addr_.address().to_string().c_str(), remote_addr_.port());
     std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
     auto it = send_msg_list_.begin();
     while (it != send_msg_list_.end()) {
@@ -25,28 +28,27 @@ TcpSession::~TcpSession()
 
 void TcpSession::goStart()
 {
-    go [this] {
-        if (server_->connect_cb_)
-            server_->connect_cb_(GetId());
+    auto this_ptr = this->shared_from_this();
+    go [=] {
+        auto holder = this_ptr;
+        if (opt_.connect_cb_)
+            opt_.connect_cb_(GetId());
         goReceive();
         goSend();
     };
 }
 
-void TcpSession::SetTimeout(int sndtimeo)
-{
-    sndtimeo_ = sndtimeo;
-}
-
 void TcpSession::goReceive()
 {
-    go [this]{
+    auto this_ptr = this->shared_from_this();
+    go [=]{
+        auto holder = this_ptr;
         for (;;)
         {
             boost_ec ec;
             std::size_t n = socket_->read_some(buffer(recv_buf_), ec);
-            if (!ec && this->server_->receive_cb_)
-                this->server_->receive_cb_(GetId(), recv_buf_.data(), n, ec);
+            if (!ec && this->opt_.receive_cb_)
+                this->opt_.receive_cb_(GetId(), recv_buf_.data(), n, ec);
 
             if (ec) {
                 SetCloseEc(ec);
@@ -58,6 +60,8 @@ void TcpSession::goReceive()
                     send_msg_cond_.TryPush(nullptr);
                 }
 
+                DebugPrint(dbg_session_alive, "TcpSession receive shutdown %s:%d",
+                        remote_addr_.address().to_string().c_str(), remote_addr_.port());
                 return ;
             }
         }
@@ -66,7 +70,9 @@ void TcpSession::goReceive()
 
 void TcpSession::goSend()
 {
-    go [this]{
+    auto this_ptr = this->shared_from_this();
+    go [=]{
+        auto holder = this_ptr;
         for (;;)
         {
             std::list<Msg*> msgs;
@@ -79,6 +85,8 @@ void TcpSession::goSend()
                     if (shutdown_ref_ == 1) {
                         --shutdown_ref_;
                         OnClose();
+                        DebugPrint(dbg_session_alive, "TcpSession send shutdown with cond %s:%d",
+                                remote_addr_.address().to_string().c_str(), remote_addr_.port());
                         return ;
                     }
                     lock.lock();
@@ -137,6 +145,8 @@ void TcpSession::goSend()
                     OnClose();
                 }
 
+                DebugPrint(dbg_session_alive, "TcpSession send shutdown with write_some %s:%d",
+                        remote_addr_.address().to_string().c_str(), remote_addr_.port());
                 return ;
             }
 
@@ -182,11 +192,12 @@ void TcpSession::SetCloseEc(boost_ec const& ec)
 
 void TcpSession::OnClose()
 {
-    if (this->server_->disconnect_cb_)
-        this->server_->disconnect_cb_(GetId(), close_ec_);
+    DebugPrint(dbg_session_alive, "TcpSession close %s:%d",
+            remote_addr_.address().to_string().c_str(), remote_addr_.port());
     boost_ec ignore_ec;
     socket_->close(ignore_ec);
-    server_->OnSessionClose(GetId());
+    if (this->opt_.disconnect_cb_)
+        this->opt_.disconnect_cb_(GetId(), close_ec_);
 }
 
 void TcpSession::Send(Buffer && buf, SndCb cb)
@@ -209,10 +220,10 @@ void TcpSession::Send(Buffer && buf, SndCb cb)
             send_msg_cond_.TryPush(nullptr);
     }
 
-    if (sndtimeo_) {
+    if (opt_.sndtimeo_) {
         msg->IncrementRef();
         auto this_ptr = this->shared_from_this();
-        msg->tid = co_timer_add(std::chrono::milliseconds(sndtimeo_), [=]{
+        msg->tid = co_timer_add(std::chrono::milliseconds(opt_.sndtimeo_), [=]{
                     msg->timeout = true;
                     if (this_ptr->CancelSend(msg))
                         if (msg->cb)
@@ -248,33 +259,10 @@ void TcpSession::Shutdown()
 
 SessionId TcpSession::GetId()
 {
-    return boost::static_pointer_cast<Session>(this->shared_from_this()); 
+    return this->shared_from_this();
 }
 
-TcpServer& TcpServer::SetConnectedCb(ConnectedCb cb)
-{
-    connect_cb_ = cb;
-    return *this;
-}
-TcpServer& TcpServer::SetReceiveCb(ReceiveCb cb)
-{
-    receive_cb_ = cb;
-    return *this;
-}
-TcpServer& TcpServer::SetDisconnectedCb(DisconnectedCb cb)
-{
-    disconnect_cb_ = cb;
-    return *this;
-}
-TcpServer& TcpServer::SetSndTimeout(int sndtimeo)
-{
-    sndtimeo_ = sndtimeo;
-    for (auto &v : sessions_)
-        v.second->SetTimeout(sndtimeo_);
-    return *this;
-}
-
-boost_ec TcpServer::goStart(std::string const& host, uint16_t port)
+boost_ec TcpServerImpl::goStart(std::string const& host, uint16_t port)
 {
     try {
         local_addr_ = tcp::endpoint(address::from_string(host), port);
@@ -290,37 +278,31 @@ boost_ec TcpServer::goStart(std::string const& host, uint16_t port)
     return boost_ec();
 }
 
-void TcpServer::Send(SessionId id, Buffer && buf, SndCb cb)
+void TcpServerImpl::Send(SessionId id, Buffer && buf, SndCb cb)
 {
-    auto it = sessions_.find(id);
-    if (it == sessions_.end()) {
-        if (cb)
-            cb(eTcpSndStatus::snd_error);
-        return ;
-    }
-
-    it->second->Send(std::move(buf), cb);
+    id->Send(std::move(buf), cb);
 }
-void TcpServer::Send(SessionId id, const void* data, size_t bytes, SndCb cb)
+void TcpServerImpl::Send(SessionId id, const void* data, size_t bytes, SndCb cb)
 {
-    auto it = sessions_.find(id);
-    if (it == sessions_.end()) {
-        if (cb)
-            cb(eTcpSndStatus::snd_error);
-        return ;
-    }
-
-    it->second->Send(data, bytes, cb);
+    id->Send(data, bytes, cb);
 }
-void TcpServer::Shutdown(SessionId id)
+void TcpServerImpl::Shutdown(SessionId id)
 {
-    auto it = sessions_.find(id);
-    if (it == sessions_.end()) return ;
-
-    it->second->Shutdown();
+    id->Shutdown();
 }
-
-void TcpServer::Accept()
+void TcpServerImpl::ShutdownAll()
+{
+    std::lock_guard<co_mutex> lock(sessions_mutex_);
+    for (auto &v : sessions_)
+        v.second->Shutdown();
+}
+void TcpServerImpl::ShutdownServer()
+{
+    boost_ec ignore_ec;
+    acceptor_->close(ignore_ec);
+    ShutdownAll();
+}
+void TcpServerImpl::Accept()
 {
     for (;;)
     {
@@ -338,21 +320,104 @@ void TcpServer::Accept()
                 s->remote_endpoint().address().to_string().c_str(),
                 s->remote_endpoint().port());
 
-        shared_ptr<TcpSession> sess(new TcpSession(s, this));
-        sessions_[sess->GetId()] = sess;
-        sess->SetTimeout(sndtimeo_);
-        sess->goStart();
+        shared_ptr<TcpSession> sess(new TcpSession(s, this->shared_from_this()));
+
+        {
+            std::lock_guard<co_mutex> lock(sessions_mutex_);
+            sessions_[sess->GetId()] = sess;
+        }
+
+        sess->SetSndTimeout(opt_.sndtimeo_)
+            .SetConnectedCb(opt_.connect_cb_)
+            .SetReceiveCb(opt_.receive_cb_)
+            .SetDisconnectedCb(boost::bind(&TcpServerImpl::OnSessionClose, this, _1, _2))
+            .goStart();
     }
 }
 
-void TcpServer::OnSessionClose(SessionId id)
+void TcpServerImpl::OnSessionClose(SessionId id, boost_ec const& ec)
 {
+    if (opt_.disconnect_cb_)
+        opt_.disconnect_cb_(id, ec);
+
+    std::lock_guard<co_mutex> lock(sessions_mutex_);
     sessions_.erase(id);
 }
 
-tcp::endpoint TcpServer::LocalAddr()
+tcp::endpoint TcpServerImpl::LocalAddr()
 {
     return local_addr_;
+}
+
+tcp::endpoint TcpServerImpl::RemoteAddr(SessionId id)
+{
+    auto it = sessions_.find(id);
+    if (it == sessions_.end()) {
+        return tcp::endpoint();
+    }
+
+    return it->second->remote_addr_;
+}
+
+boost_ec TcpClientImpl::Connect(std::string const& host, uint16_t port)
+{
+    shared_ptr<tcp::socket> s(new tcp::socket(ios_));
+    tcp::endpoint addr(address::from_string(host), port);
+    boost_ec ec;
+    s->connect(addr, ec);
+    if (ec)
+        return ec;
+
+    sess_.reset(new TcpSession(s, this->shared_from_this()));
+    sess_->SetSndTimeout(opt_.sndtimeo_)
+        .SetConnectedCb(opt_.connect_cb_)
+        .SetReceiveCb(opt_.receive_cb_)
+        .SetDisconnectedCb(boost::bind(&TcpClientImpl::OnSessionClose, this, _1, _2))
+        .goStart();
+    return boost_ec();
+}
+bool TcpClientImpl::IsEstab()
+{
+    return !!sess_;
+}
+void TcpClientImpl::Send(Buffer && buf, SndCb cb)
+{
+    if (!sess_) {
+        if (cb)
+            cb(eTcpSndStatus::snd_error);
+        return ;
+    }
+
+    sess_->Send(std::move(buf), cb);
+}
+void TcpClientImpl::Send(const void* data, size_t bytes, SndCb cb)
+{
+    if (!sess_) {
+        if (cb)
+            cb(eTcpSndStatus::snd_error);
+        return ;
+    }
+
+    sess_->Send(data, bytes, cb);
+}
+void TcpClientImpl::Shutdown()
+{
+    if (sess_)
+        sess_->Shutdown();
+}
+void TcpClientImpl::OnSessionClose(SessionId id, boost_ec const& ec)
+{
+    if (opt_.disconnect_cb_)
+        opt_.disconnect_cb_(id, ec);
+    sess_.reset();
+}
+tcp::endpoint TcpClientImpl::LocalAddr()
+{
+    return sess_ ? sess_->local_addr_ : tcp::endpoint();
+}
+tcp::endpoint TcpClientImpl::RemoteAddr()
+{
+    return sess_ ? sess_->remote_addr_ : tcp::endpoint();
 }
 
 } //namespace network
