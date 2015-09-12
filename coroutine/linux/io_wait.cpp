@@ -56,7 +56,7 @@ void IoWait::SchedulerSwitch(Task* tk)
     // 并且重新进入一次syscall, 导致id变化.
     uint32_t id = tk->io_block_id_;
 
-    RefGuard ref_guard(tk);
+    RefGuard<> ref_guard(tk);
     wait_tasks_.push(tk);
     std::vector<std::pair<int, uint32_t>> rollback_list;
     for (auto &fdst : tk->wait_fds_)

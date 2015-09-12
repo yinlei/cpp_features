@@ -102,18 +102,28 @@ struct Task
     static std::size_t GetDeletedTaskCount();
 };
 
+template <typename T = Task>
 class RefGuard
 {
 public:
-    explicit RefGuard(Task* tk);
-    explicit RefGuard(Task& tk);
-    ~RefGuard();
+    explicit RefGuard(T* tk) : tk_(tk)
+    {
+        tk_->IncrementRef();
+    }
+    explicit RefGuard(T& tk) : tk_(&tk)
+    {
+        tk_->IncrementRef();
+    }
+    ~RefGuard()
+    {
+        tk_->DecrementRef();
+    }
 
     RefGuard(RefGuard const&) = delete;
     RefGuard& operator=(RefGuard const&) = delete;
 
 private:
-    Task *tk_;
+    T *tk_;
 };
 
 

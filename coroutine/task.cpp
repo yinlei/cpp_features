@@ -148,18 +148,4 @@ void Task::DecrementRef()
     }
 }
 
-RefGuard::RefGuard(Task* tk) : tk_(tk)
-{
-    tk_->IncrementRef();
-}
-RefGuard::RefGuard(Task& tk) : tk_(&tk)
-{
-    tk_->IncrementRef();
-}
-RefGuard::~RefGuard()
-{
-    tk_->DecrementRef();
-}
-
-
 } //namespace co

@@ -39,6 +39,7 @@ static const uint64_t dbg_syncblock         = 0x1 << 8;
 static const uint64_t dbg_timer             = 0x1 << 9;
 static const uint64_t dbg_scheduler_sleep   = 0x1 << 10;
 static const uint64_t dbg_sleepblock        = 0x1 << 11;
+static const uint64_t dbg_sys_max           = dbg_sleepblock;
 ///-------------------
 
 // 协程中抛出未捕获异常时的处理方式
