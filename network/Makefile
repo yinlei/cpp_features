@@ -1,0 +1,25 @@
+CC=g++
+CFLAGS=-std=c++11 -g -Wall -fPIC
+STATIC_LIB=libnetwork.a
+INCLUDE=-I.
+OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))
+
+all : $(STATIC_LIB)
+
+$(STATIC_LIB) : $(OBJS)
+	@ar cr $@ $^
+	@echo "LD $(STATIC_LIB)"
+
+.cpp.o:
+	@echo "CC $@"
+	@$(CC) $(CFLAGS) $(INCLUDE) -c $^ -o $@
+
+.PHONY: clean install
+
+clean:
+	rm *.o $(STATIC_LIB) -f
+
+install:
+	install -m 0664 $(STATIC_LIB) /usr/lib
+	mkdir -p /usr/include/network
+	install -m 0664 *.h /usr/include/network
