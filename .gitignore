@@ -1,1 +1,5 @@
 *.o
+*.t
+*.a
+*.so
+coroutine/unit_test/gtest_unit/gtest/*
