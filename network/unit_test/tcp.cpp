@@ -19,7 +19,7 @@ TEST(Network, TcpServer)
             printf("connected.\n");
         }).SetDisconnectedCb([](tcp::sess_id_t id, boost_ec const& ec) {
             printf("disconnected. reason %d:%s\n", ec.value(), ec.message().c_str());
-        }).SetReceiveCb([&](tcp::sess_id_t id, const char* data, size_t bytes, boost_ec& ec){
+        }).SetReceiveCb([&](tcp::sess_id_t id, const char* data, size_t bytes){
             printf("receive: %.*s\n", (int)bytes, data);
             tcp::Send(id, data, bytes);
             if (strstr(std::string(data, bytes).c_str(), "shutdown")) {
@@ -40,7 +40,7 @@ TEST(Network, TcpServer)
              .SetConnectedCb([](tcp::sess_id_t id){
                 tcp::Send(id, "ping", 4);
              })
-             .SetReceiveCb([ping_c](tcp::sess_id_t id, const char* data, size_t bytes, boost_ec& ec){
+             .SetReceiveCb([ping_c](tcp::sess_id_t id, const char* data, size_t bytes){
                 if (++*ping_c < 3) {
                     tcp::Send(id, "ping", 4);
                 }

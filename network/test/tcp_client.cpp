@@ -33,7 +33,7 @@ void foo()
                 ::sleep(3);
             }
         };
-    }).SetDisconnectedCb(&on_disconnect).SetReceiveCb([](tcp::sess_id_t id, const char* data, size_t bytes, boost_ec& ec){
+    }).SetDisconnectedCb(&on_disconnect).SetReceiveCb([](tcp::sess_id_t id, const char* data, size_t bytes){
         printf("receive: %.*s\n", (int)bytes, data);
     });
     boost_ec ec = client.Connect(g_ip, g_port);

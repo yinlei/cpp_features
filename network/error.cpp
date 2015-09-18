@@ -22,6 +22,9 @@ std::string network_error_category::message(int v) const
 
         case (int)eNetworkErrorCode::ec_shutdown:
             return "user shutdown";
+
+        case (int)eNetworkErrorCode::ec_half:
+            return "send or recv half of package";
     }
 
     return "";

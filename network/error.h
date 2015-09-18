@@ -14,6 +14,8 @@ enum class eNetworkErrorCode : int
     ec_connecting = 1,
     ec_estab = 2,
     ec_shutdown = 3,
+    ec_half = 4,
+    ec_no_destition = 4,
 };
 
 class network_error_category

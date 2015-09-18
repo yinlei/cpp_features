@@ -10,17 +10,10 @@ int main()
 {
     co_sched.GetOptions().debug = network::dbg_session_alive;
 
-    tcp::server server;
-    server.SetConnectedCb([](tcp::sess_id_t id){
-        printf("connected from %s:%d\n", tcp::RemoteAddr(id).address().to_string().c_str(), tcp::RemoteAddr(id).port());
-    }).SetDisconnectedCb([](tcp::sess_id_t id, boost_ec const& ec) {
-        printf("disconnected. reason %d:%s\n", ec.value(), ec.message().c_str());
-    }).SetReceiveCb([&](tcp::sess_id_t id, const char* data, size_t bytes){
+    udp::server server;
+    server.SetReceiveCb([&](udp::sess_id_t id, const char* data, size_t bytes){
         printf("receive: %.*s\n", (int)bytes, data);
-        tcp::Send(id, data, bytes);
-        if (strstr(std::string(data, bytes).c_str(), "shutdown")) {
-            tcp::Shutdown(id);
-        }
+        udp::Send(id, data, bytes);
     });
     boost_ec ec = server.goStart("0.0.0.0", 3030);
     if (ec) {

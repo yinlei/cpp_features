@@ -38,13 +38,14 @@ typedef std::vector<char> Buffer;
 class TcpSession;
 typedef shared_ptr<TcpSession> SessionId;
 typedef boost::function<void(SessionId)> ConnectedCb;
-typedef boost::function<void(SessionId, const char* data, size_t bytes, boost_ec&)> ReceiveCb;
+typedef boost::function<void(SessionId, const char* data, size_t bytes)> ReceiveCb;
 typedef boost::function<void(SessionId, boost_ec const&)> DisconnectedCb;
 class LifeHolder {};
 
 struct TcpOptionsData
 {
     int sndtimeo_ = 0;
+    uint32_t max_pack_size_ = 4096;
     ConnectedCb connect_cb_;
     ReceiveCb receive_cb_;
     DisconnectedCb disconnect_cb_;
@@ -56,60 +57,94 @@ struct TcpOptionsData
     }
 };
 
-template <typename Drived>
-struct TcpOptions
+struct TcpOptionsBase
 {
     TcpOptionsData opt_;
-    std::list<TcpOptionsData*> lnks_;
+    std::list<TcpOptionsBase*> lnks_;
 
-    Drived& GetThisDrived()
+    void Link(TcpOptionsBase & other)
     {
-        return *static_cast<Drived*>(this);
+        lnks_.push_back(&other);
     }
 
-    template <typename Other>
-    void Link(TcpOptions<Other> & other)
-    {
-        lnks_.push_back(&other.opt_);
-    }
-
-    Drived& SetConnectedCb(ConnectedCb cb)
+    void SetConnectedCb(ConnectedCb cb)
     {
         opt_.connect_cb_ = cb;
-        for (auto o:lnks_)
-            o->connect_cb_ = cb;
         OnSetConnectedCb();
-        return GetThisDrived();
+        for (auto o:lnks_)
+            o->SetConnectedCb(cb);
     }
-    Drived& SetReceiveCb(ReceiveCb cb)
+    void SetReceiveCb(ReceiveCb cb)
     {
         opt_.receive_cb_ = cb;
-        for (auto o:lnks_)
-            o->receive_cb_ = cb;
         OnSetReceiveCb();
-        return GetThisDrived();
+        for (auto o:lnks_)
+            o->SetReceiveCb(cb);
     }
-    Drived& SetDisconnectedCb(DisconnectedCb cb)
+    void SetDisconnectedCb(DisconnectedCb cb)
     {
         opt_.disconnect_cb_ = cb;
-        for (auto o:lnks_)
-            o->disconnect_cb_ = cb;
         OnSetDisconnectedCb();
-        return GetThisDrived();
+        for (auto o:lnks_)
+            o->SetDisconnectedCb(cb);
     }
-    Drived& SetSndTimeout(int sndtimeo)
+    void SetSndTimeout(int sndtimeo)
     {
         opt_.sndtimeo_ = sndtimeo;
-        for (auto o:lnks_)
-            o->sndtimeo_ = sndtimeo;
         OnSetSndTimeout();
-        return GetThisDrived();
+        for (auto o:lnks_)
+            o->SetSndTimeout(sndtimeo);
+    }
+    void SetMaxPackSize(uint32_t max_pack_size)
+    {
+        opt_.max_pack_size_ = max_pack_size;
+        OnSetMaxPackSize();
+        for (auto o:lnks_)
+            o->SetMaxPackSize(max_pack_size);
     }
     virtual void OnSetConnectedCb() {}
     virtual void OnSetReceiveCb() {}
     virtual void OnSetDisconnectedCb() {}
     virtual void OnSetSndTimeout() {}
+    virtual void OnSetMaxPackSize() {}
 };
+
+template <typename Drived>
+struct TcpOptions : public TcpOptionsBase
+{
+    Drived& GetThisDrived()
+    {
+        return *static_cast<Drived*>(this);
+    }
+
+    Drived& SetConnectedCb(ConnectedCb cb)
+    {
+        TcpOptionsBase::SetConnectedCb(cb);
+        return GetThisDrived();
+    }
+    Drived& SetReceiveCb(ReceiveCb cb)
+    {
+        TcpOptionsBase::SetReceiveCb(cb);
+        return GetThisDrived();
+    }
+    Drived& SetDisconnectedCb(DisconnectedCb cb)
+    {
+        TcpOptionsBase::SetDisconnectedCb(cb);
+        return GetThisDrived();
+    }
+    Drived& SetSndTimeout(int sndtimeo)
+    {
+        TcpOptionsBase::SetSndTimeout(sndtimeo);
+        return GetThisDrived();
+    }
+    Drived& SetMaxPackSize(uint32_t max_pack_size)
+    {
+        TcpOptionsBase::SetMaxPackSize(max_pack_size);
+        return GetThisDrived();
+    }
+};
+
+io_service& GetTcpIoService();
 
 class TcpServerImpl;
 class TcpSession
@@ -139,7 +174,7 @@ public:
             boost::intrusive::constant_time_size<false>
         > MsgList;
 
-    explicit TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder);
+    explicit TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder, uint32_t max_pack_size);
     ~TcpSession();
     void goStart();
     void Send(Buffer && buf, SndCb cb = NULL);
@@ -188,7 +223,6 @@ private:
     void OnSessionClose(SessionId id, boost_ec const& ec);
 
 private:
-    io_service ios_;
     shared_ptr<tcp::acceptor> acceptor_;
     tcp::endpoint local_addr_;
     shared_ptr<tcp::socket> socket_;
@@ -247,7 +281,6 @@ private:
     void OnSessionClose(SessionId id, boost_ec const& ec);
 
 private:
-    io_service ios_;
     shared_ptr<TcpSession> sess_;
     co_mutex connect_mtx_;
     friend TcpSession;
