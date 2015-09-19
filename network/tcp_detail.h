@@ -95,7 +95,7 @@ class TcpServerImpl
 public:
     typedef std::map<::network::SessionId, shared_ptr<TcpSession>> Sessions;
 
-    boost_ec goStart(std::string const& host, uint16_t port);
+    boost_ec goStart(endpoint addr);
     void ShutdownAll();
     void Shutdown();
     tcp::endpoint LocalAddr();
@@ -128,9 +128,9 @@ public:
         Shutdown();
     }
 
-    boost_ec goStart(std::string const& host, uint16_t port)
+    boost_ec goStart(endpoint addr)
     {
-        return impl_->goStart(host, port);
+        return impl_->goStart(addr);
     }
 
     void ShutdownAll()
@@ -161,7 +161,7 @@ class TcpClientImpl
     : public Options<TcpClientImpl>, public LifeHolder, public boost::enable_shared_from_this<TcpClientImpl>
 {
 public:
-    boost_ec Connect(std::string const& host, uint16_t port);
+    boost_ec Connect(endpoint addr);
     tcp_sess_id_t GetSessId();
 
 private:
@@ -183,9 +183,9 @@ public:
     }
     ~TcpClient();
 
-    boost_ec Connect(std::string const& host, uint16_t port)
+    boost_ec Connect(endpoint addr)
     {
-        return impl_->Connect(host, port);
+        return impl_->Connect(addr);
     }
     SessionId GetSessId()
     {

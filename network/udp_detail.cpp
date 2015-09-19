@@ -34,9 +34,8 @@ namespace udp_detail {
         };
         return boost_ec();
     }
-    boost_ec UdpPointImpl::goStart(std::string const& host, uint16_t port)
+    boost_ec UdpPointImpl::goStart(endpoint addr)
     {
-        udp::endpoint addr(address::from_string(host), port);
         return goStart(addr);
     }
     void UdpPointImpl::Shutdown()
@@ -84,14 +83,13 @@ namespace udp_detail {
         if (n < bytes) return MakeNetworkErrorCode(eNetworkErrorCode::ec_half);
         return boost_ec();
     }
-    boost_ec UdpPointImpl::Connect(std::string const& host, uint16_t port)
+    boost_ec UdpPointImpl::Connect(endpoint addr)
     {
         boost_ec ec;
         if (!init_) {
             ec = goStart(local_addr_);
             if (ec) return ec;
         }
-        udp::endpoint addr(address::from_string(host), port);
         socket_->connect(addr, ec);
         if (!ec)
             remote_addr_ = addr;

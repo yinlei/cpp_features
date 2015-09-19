@@ -2,7 +2,8 @@ CC=g++
 CFLAGS=-std=c++11 -g -Wall
 INCLUDE=-I.. -I../../coroutine/unit_test/gtest_unit/gtest/include
 LINK=-L../../coroutine/unit_test/gtest_unit/gtest/lib/.libs -lcoroutine -ldl -lnetwork -lgtest_main -lgtest -lpthread -L..\
-	 -lboost_thread -lboost_system -lpthread
+	 -lboost_thread -lboost_system -lboost_regex -lpthread
+#LINK+=-static -static-libgcc -static-libstdc++
 TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp))
 
 all : /usr/lib/libgtest.a $(TARGET)

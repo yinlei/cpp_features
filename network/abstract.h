@@ -12,6 +12,64 @@ namespace network {
     static const uint64_t dbg_session_alive          = co::dbg_sys_max << 2;
     static const uint64_t dbg_network_max            = dbg_session_alive;
 
+    enum class proto_type {
+        unkown,
+        tcp,
+        udp,
+        tls,
+        http,
+        https,
+        zk,
+    };
+    proto_type str2proto(std::string const& s);
+    std::string proto2str(proto_type proto);
+
+    struct Protocol;
+    struct endpoint : public ::boost::asio::ip::basic_endpoint<Protocol>
+    {
+        typedef ::boost::asio::ip::basic_endpoint<Protocol> base_t;
+
+        endpoint() {}
+        endpoint(const endpoint&) = default;
+        endpoint(endpoint&&) = default;
+        endpoint& operator=(const endpoint&) = default;
+        endpoint& operator=(endpoint&&) = default;
+
+        using base_t::base_t;
+
+        template <typename Proto>
+            explicit endpoint(::boost::asio::ip::basic_endpoint<Proto> const& ep)
+            : base_t(ep.addres(), ep.port())
+            {
+            }
+
+        operator ::boost::asio::ip::tcp::endpoint() const
+        {
+            return ::boost::asio::ip::tcp::endpoint(address(), port()); 
+        }
+
+        operator ::boost::asio::ip::udp::endpoint() const
+        {
+            return ::boost::asio::ip::udp::endpoint(address(), port()); 
+        }
+
+        std::string to_string(boost_ec & ec) const;
+
+        // @url:
+        //  tcp://127.0.0.1:3030
+        //  udp://127.0.0.1:3030
+        //  tls://127.0.0.1:3030
+        //  http://127.0.0.1
+        //  http://127.0.0.1:3030
+        //  http://127.0.0.1:3030/route/index.html
+        //  https
+        //  zk://127.0.0.1:2181,192.168.1.10:2181/zk_path/node
+        static endpoint from_string(std::string const& url, boost_ec & ec);
+
+        proto_type proto_ = proto_type::unkown;
+        std::string path_;
+    };
+
     struct OptionsBase;
     struct SessionIdBase
     {
@@ -21,14 +79,14 @@ namespace network {
     struct ServerBase
     {
         virtual ~ServerBase() {}
-        virtual boost_ec goStart(std::string const& host, uint16_t port) = 0;
+        virtual boost_ec goStart(endpoint addr) = 0;
         virtual void Shutdown() = 0;
         virtual OptionsBase* GetOptions() = 0;
     };
     struct ClientBase
     {
         virtual ~ClientBase() {}
-        virtual boost_ec Connect(std::string const& host, uint16_t port) = 0;
+        virtual boost_ec Connect(endpoint addr) = 0;
         virtual SessionId GetSessId() = 0;
         virtual OptionsBase* GetOptions() = 0;
     };
@@ -45,71 +103,14 @@ namespace network {
     struct Protocol
     {
         typedef ::network::SessionId sess_id_t;
+        typedef ::network::endpoint endpoint;
         virtual ~Protocol() {}
-
-        enum class proto_type {
-            unkown,
-            tcp,
-            udp,
-            tls,
-            http,
-            https,
-            zk,
-        };
-
-        static proto_type str2proto(std::string const& s);
-        static std::string proto2str(proto_type proto);
 
         static Protocol v4();
         static Protocol v6();
         int type() const;
         int protocol() const;
         int family() const;
-
-        struct endpoint : public ::boost::asio::ip::basic_endpoint<Protocol>
-        {
-            typedef ::boost::asio::ip::basic_endpoint<Protocol> base_t;
-
-            endpoint() {}
-            endpoint(const endpoint&) = default;
-            endpoint(endpoint&&) = default;
-            endpoint& operator=(const endpoint&) = default;
-            endpoint& operator=(endpoint&&) = default;
-
-            using base_t::base_t;
-
-            template <typename Proto>
-            explicit endpoint(::boost::asio::ip::basic_endpoint<Proto> const& ep)
-                : base_t(ep.addres(), ep.port())
-            {
-            }
-
-            operator ::boost::asio::ip::tcp::endpoint() const
-            {
-                return ::boost::asio::ip::tcp::endpoint(address(), port()); 
-            }
-
-            operator ::boost::asio::ip::udp::endpoint() const
-            {
-                return ::boost::asio::ip::udp::endpoint(address(), port()); 
-            }
-
-            std::string to_string() const;
-
-            // @url:
-            //  tcp://127.0.0.1:3030
-            //  udp://127.0.0.1:3030
-            //  tls://127.0.0.1:3030
-            //  http://127.0.0.1
-            //  http://127.0.0.1:3030
-            //  http://127.0.0.1:3030/route/index.html
-            //  https
-            //  zk://127.0.0.1:2181,192.168.1.10:2181/zk_path/node
-            static endpoint from_string(std::string const& url, boost_ec & ec);
-
-            proto_type proto_ = proto_type::unkown;
-            std::string path_;
-        };
 
         virtual void Send(sess_id_t id, Buffer && buf, SndCb const& cb = NULL) {}
         virtual void Send(sess_id_t id, const void* data, size_t bytes, SndCb const& cb = NULL) {}
@@ -127,9 +128,6 @@ namespace network {
         int family_;
         proto_type proto_;
     };
-
-    typedef Protocol::endpoint endpoint;
-    typedef Protocol::proto_type proto_type;
 
 #ifdef _DEBUG
 # define NETWORK_UPPER_CAST(dest) dynamic_cast<dest*>

@@ -14,8 +14,8 @@ namespace network {
         }
 
     private:
-        Protocol** proto_;
-        explicit ProtocolRef(Protocol* &proto);
+        boost::shared_ptr<Protocol*> proto_;
+        explicit ProtocolRef(boost::shared_ptr<Protocol*> proto);
         friend class Server;
         friend class Client;
     };
@@ -23,6 +23,7 @@ namespace network {
     class Server : public Options<Server>
     {
     public:
+        Server();
         // @url:
         //    tcp://127.0.0.1:3030
         //    udp://127.0.0.1:3030
@@ -32,7 +33,7 @@ namespace network {
         ProtocolRef GetProtocol();
 
     private:
-        Protocol * protocol_ = nullptr;
+        boost::shared_ptr<Protocol*> protocol_;
         boost::shared_ptr<ServerBase> impl_;
         endpoint local_addr_;
     };
@@ -40,6 +41,7 @@ namespace network {
     class Client : public Options<Client>
     {
     public:
+        Client();
         // @url:
         //    tcp://127.0.0.1:3030
         //    udp://127.0.0.1:3030
@@ -52,7 +54,7 @@ namespace network {
         SessionId GetSessId();
 
     private:
-        Protocol * protocol_ = nullptr;
+        boost::shared_ptr<Protocol*> protocol_;
         boost::shared_ptr<ClientBase> impl_;
         endpoint local_addr_;
     };

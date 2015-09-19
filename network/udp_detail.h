@@ -39,11 +39,11 @@ class UdpPointImpl
 public:
     UdpPointImpl();
 
-    boost_ec goStart(std::string const& host, uint16_t port);
+    boost_ec goStart(endpoint addr);
     void Shutdown();
     boost_ec Send(std::string const& host, uint16_t port, const void* data, std::size_t bytes);
     boost_ec Send(udp::endpoint destition, const void* data, std::size_t bytes);
-    boost_ec Connect(std::string const& host, uint16_t port);
+    boost_ec Connect(endpoint addr);
     boost_ec Send(const void* data, size_t bytes);
     udp::endpoint LocalAddr();
     udp::endpoint RemoteAddr();
@@ -79,9 +79,9 @@ public:
         Shutdown();
     }
 
-    boost_ec goStart(std::string const& host, uint16_t port)
+    boost_ec goStart(endpoint addr)
     {
-        return impl_->goStart(host, port);
+        return impl_->goStart(addr);
     }
     void Shutdown()
     {
@@ -95,9 +95,9 @@ public:
     {
         return impl_->Send(destition, data, bytes);
     }
-    boost_ec Connect(std::string const& host, uint16_t port)
+    boost_ec Connect(endpoint addr)
     {
-        return impl_->Connect(host, port);
+        return impl_->Connect(addr);
     }
     boost_ec Send(const void* data, size_t bytes)
     {

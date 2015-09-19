@@ -13,7 +13,7 @@ namespace network {
         "zk",
     };
 
-    proto_type Protocol::str2proto(std::string const& s)
+    proto_type str2proto(std::string const& s)
     {
         static int n = sizeof(proto_type_s) / sizeof(char const*);
         for (int i = 0; i < n; ++i)
@@ -22,7 +22,7 @@ namespace network {
 
         return proto_type::unkown;
     }
-    std::string Protocol::proto2str(proto_type proto)
+    std::string proto2str(proto_type proto)
     {
         static int n = sizeof(proto_type_s) / sizeof(char const*);
         if ((int)proto >= n)
@@ -86,13 +86,15 @@ namespace network {
         return family_;
     }
 
-    std::string Protocol::endpoint::to_string() const
+    std::string Protocol::endpoint::to_string(boost_ec & ec) const
     {
         std::string url;
         if (proto_ != proto_type::unkown) {
             url += proto2str(proto_) + "://";
         }
-        url += address().to_string();
+        url += address().to_string(ec);
+        if (ec) return "";
+
         url += ":";
         url += std::to_string(port());
         url += path_;
@@ -114,7 +116,9 @@ namespace network {
             return endpoint();
         }
 
-        endpoint ep(::boost::asio::ip::address::from_string(result[3].str()), atoi(result[5].str().c_str()));
+        endpoint ep(::boost::asio::ip::address::from_string(result[3].str(), ec), atoi(result[5].str().c_str()));
+        if (ec) return endpoint();
+
         ep.proto_ = str2proto(result[2].str());
         ep.path_ = result[6].str();
         return ep;

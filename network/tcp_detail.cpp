@@ -14,8 +14,9 @@ namespace tcp_detail {
     TcpSession::TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder, uint32_t max_pack_size)
         : socket_(s), holder_(holder), recv_buf_(max_pack_size), send_msg_cond_(1), shutdown_ref_{2}
     {
-        local_addr_ = s->local_endpoint();
-        remote_addr_ = s->remote_endpoint();
+        boost_ec ignore_ec;
+        local_addr_ = s->local_endpoint(ignore_ec);
+        remote_addr_ = s->remote_endpoint(ignore_ec);
     }
 
     TcpSession::~TcpSession()
@@ -67,7 +68,9 @@ namespace tcp_detail {
                     DebugPrint(dbg_session_alive, "TcpSession receive shutdown %s:%d",
                             remote_addr_.address().to_string().c_str(), remote_addr_.port());
                     return ;
-                } else if (this->opt_.receive_cb_)
+//                } else if (!n) {
+//                    printf("not error but n is 0. recv_buf size: %d, socket: %d\n", (int)recv_buf_.size(), socket_->native_handle());
+                } else if (n > 0 && this->opt_.receive_cb_)
                     this->opt_.receive_cb_(GetId(), recv_buf_.data(), n);
             }
         };
@@ -207,8 +210,17 @@ namespace tcp_detail {
 
     void TcpSession::Send(Buffer && buf, SndCb const& cb)
     {
-        if (!shutdown_ref_ && cb)
-            cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
+        if (!shutdown_ref_) {
+            if (cb)
+                cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
+            return ;
+        }
+
+        if (buf.empty()) {
+            if (cb)
+                cb(boost_ec());
+            return ;
+        }
 
         Msg *msg = new Msg(++msg_id_, cb);
         msg->buf = std::move(buf);
@@ -273,10 +285,10 @@ namespace tcp_detail {
         return this->shared_from_this();
     }
 
-    boost_ec TcpServerImpl::goStart(std::string const& host, uint16_t port)
+    boost_ec TcpServerImpl::goStart(endpoint addr)
     {
         try {
-            local_addr_ = tcp::endpoint(address::from_string(host), port);
+            local_addr_ = addr;
             acceptor_.reset(new tcp::acceptor(GetTcpIoService(), local_addr_, true));
         } catch (boost::system::system_error& e)
         {
@@ -357,14 +369,13 @@ namespace tcp_detail {
     }
 
 
-    boost_ec TcpClientImpl::Connect(std::string const& host, uint16_t port)
+    boost_ec TcpClientImpl::Connect(endpoint addr)
     {
         if (sess_ && sess_->IsEstab()) return MakeNetworkErrorCode(eNetworkErrorCode::ec_estab);
         std::unique_lock<co_mutex> lock(connect_mtx_, std::defer_lock);
         if (!lock.try_lock()) return MakeNetworkErrorCode(eNetworkErrorCode::ec_connecting);
 
         shared_ptr<tcp::socket> s(new tcp::socket(GetTcpIoService()));
-        tcp::endpoint addr(address::from_string(host), port);
         boost_ec ec;
         s->connect(addr, ec);
         if (ec)

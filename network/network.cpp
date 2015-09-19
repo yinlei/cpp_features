@@ -3,10 +3,13 @@
 
 namespace network {
 
-    ProtocolRef::ProtocolRef(Protocol* &proto)
-        : proto_(&proto)
+    ProtocolRef::ProtocolRef(boost::shared_ptr<Protocol*> proto)
+        : proto_(proto)
     {}
 
+    Server::Server()
+        : protocol_(new Protocol*(nullptr))
+    {}
     boost_ec Server::goStart(std::string const& url)
     {
         boost_ec ec;
@@ -14,14 +17,14 @@ namespace network {
         if (ec) return ec;
 
         if (local_addr_.proto_ == proto_type::tcp) {
-            protocol_ = tcp::instance();
+            *protocol_ = tcp::instance();
         } else if (local_addr_.proto_ == proto_type::udp) {
-            protocol_ = udp::instance();
+            *protocol_ = udp::instance();
         }
 
-        impl_ = protocol_->CreateServer();
+        impl_ = (*protocol_)->CreateServer();
         this->Link(*impl_->GetOptions());
-        return impl_->goStart(local_addr_.address().to_string(), local_addr_.port());
+        return impl_->goStart(local_addr_);
     }
     void Server::Shutdown()
     {
@@ -36,6 +39,9 @@ namespace network {
         return ProtocolRef(protocol_);
     }
 
+    Client::Client()
+        : protocol_(new Protocol*(nullptr))
+    {}
     boost_ec Client::Connect(std::string const& url)
     {
         boost_ec ec;
@@ -43,14 +49,14 @@ namespace network {
         if (ec) return ec;
 
         if (local_addr_.proto_ == proto_type::tcp) {
-            protocol_ = tcp::instance();
+            *protocol_ = tcp::instance();
         } else if (local_addr_.proto_ == proto_type::udp) {
-            protocol_ = udp::instance();
+            *protocol_ = udp::instance();
         }
 
-        impl_ = protocol_->CreateClient();
+        impl_ = (*protocol_)->CreateClient();
         this->Link(*impl_->GetOptions());
-        return impl_->Connect(local_addr_.address().to_string(), local_addr_.port());
+        return impl_->Connect(local_addr_);
     }
     void Client::Send(const void* data, size_t bytes, SndCb cb)
     {
@@ -60,7 +66,7 @@ namespace network {
             return ;
         }
 
-        protocol_->Send(GetSessId(), data, bytes, cb);
+        (*protocol_)->Send(GetSessId(), data, bytes, cb);
     }
     void Client::Shutdown()
     {
@@ -72,8 +78,8 @@ namespace network {
     }
     endpoint Client::RemoteAddr()
     {
-        if (protocol_ && impl_)
-            return protocol_->RemoteAddr(impl_->GetSessId());
+        if (*protocol_ && impl_)
+            return (*protocol_)->RemoteAddr(impl_->GetSessId());
 
         return endpoint();
     }

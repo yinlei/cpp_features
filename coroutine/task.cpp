@@ -16,38 +16,42 @@ LFLock Task::s_delete_list_lock;
 
 static void C_func(Task* self)
 {
-    try {
+    if (g_Scheduler.GetOptions().exception_handle == eCoExHandle::immedaitely_throw) {
         (self->fn_)();
-    } catch (std::exception& e) {
-        switch (g_Scheduler.GetOptions().exception_handle) {
-            case eCoExHandle::immedaitely_throw:
-                throw ;
-                break;
+    } else {
+        try {
+            (self->fn_)();
+        } catch (std::exception& e) {
+            switch (g_Scheduler.GetOptions().exception_handle) {
+                case eCoExHandle::immedaitely_throw:
+                    throw ;
+                    break;
 
-            case eCoExHandle::delay_rethrow:
-                self->eptr_ = std::current_exception();
-                break;
+                case eCoExHandle::delay_rethrow:
+                    self->eptr_ = std::current_exception();
+                    break;
 
-            default:
-            case eCoExHandle::debugger_only:
-                DebugPrint(dbg_exception, "task(%s) has uncaught exception:%s",
-                        self->DebugInfo(), e.what());
-                break;
-        }
-    } catch (...) {
-        switch (g_Scheduler.GetOptions().exception_handle) {
-            case eCoExHandle::immedaitely_throw:
-                throw ;
-                break;
+                default:
+                case eCoExHandle::debugger_only:
+                    DebugPrint(dbg_exception, "task(%s) has uncaught exception:%s",
+                            self->DebugInfo(), e.what());
+                    break;
+            }
+        } catch (...) {
+            switch (g_Scheduler.GetOptions().exception_handle) {
+                case eCoExHandle::immedaitely_throw:
+                    throw ;
+                    break;
 
-            case eCoExHandle::delay_rethrow:
-                self->eptr_ = std::current_exception();
-                break;
+                case eCoExHandle::delay_rethrow:
+                    self->eptr_ = std::current_exception();
+                    break;
 
-            default:
-            case eCoExHandle::debugger_only:
-                DebugPrint(dbg_exception, "task(%s) has uncaught exception.", self->DebugInfo());
-                break;
+                default:
+                case eCoExHandle::debugger_only:
+                    DebugPrint(dbg_exception, "task(%s) has uncaught exception.", self->DebugInfo());
+                    break;
+            }
         }
     }
 
