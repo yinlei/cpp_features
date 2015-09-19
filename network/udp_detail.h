@@ -9,6 +9,8 @@
 #include <boost/function.hpp>
 #include <coroutine/coroutine.h>
 #include "error.h"
+#include "abstract.h"
+#include "option.h"
 
 namespace network {
 namespace udp_detail {
@@ -19,82 +21,25 @@ using boost_ec = boost::system::error_code;
 using boost::shared_ptr;
 
 class UdpPointImpl;
-struct SessionId
+struct _udp_sess_id_t : public ::network::SessionIdBase
 {
     shared_ptr<UdpPointImpl> udp_point;
     udp::endpoint remote_addr;
+
+    _udp_sess_id_t(shared_ptr<UdpPointImpl> const& point,
+            udp::endpoint const& addr)
+        : udp_point(point), remote_addr(addr)
+        {}
 };
-typedef std::vector<char> Buffer;
-typedef boost::function<void(SessionId, const char* data, size_t bytes)> ReceiveCb;
-
-struct UdpOptionsData
-{
-    uint32_t max_pack_size_ = 4096;
-    ReceiveCb receive_cb_;
-
-    static UdpOptionsData& DefaultOption()
-    {
-        static UdpOptionsData data;
-        return data;
-    }
-};
-
-struct UdpOptionsBase
-{
-    UdpOptionsData opt_;
-    std::list<UdpOptionsBase*> lnks_;
-
-    void Link(UdpOptionsBase & other)
-    {
-        lnks_.push_back(&other);
-    }
-
-    void SetReceiveCb(ReceiveCb cb)
-    {
-        opt_.receive_cb_ = cb;
-        OnSetReceiveCb();
-        for (auto o:lnks_)
-            o->SetReceiveCb(cb);
-    }
-    void SetMaxPackSize(uint32_t max_pack_size)
-    {
-        opt_.max_pack_size_ = max_pack_size;
-        OnSetMaxPackSize();
-        for (auto o:lnks_)
-            o->SetMaxPackSize(max_pack_size);
-    }
-    virtual void OnSetReceiveCb() {}
-    virtual void OnSetMaxPackSize() {}
-};
-
-template <typename Drived>
-struct UdpOptions : public UdpOptionsBase
-{
-    Drived& GetThisDrived()
-    {
-        return *static_cast<Drived*>(this);
-    }
-
-    Drived& SetReceiveCb(ReceiveCb cb)
-    {
-        UdpOptionsBase::SetReceiveCb(cb);
-        return GetThisDrived();
-    }
-    Drived& SetMaxPackSize(uint32_t max_pack_size)
-    {
-        UdpOptionsBase::SetMaxPackSize(max_pack_size);
-        return GetThisDrived();
-    }
-};
+typedef shared_ptr<_udp_sess_id_t> udp_sess_id_t;
 
 class UdpPointImpl
-    : public UdpOptions<UdpPointImpl>, public boost::enable_shared_from_this<UdpPointImpl>
+    : public Options<UdpPointImpl>, public boost::enable_shared_from_this<UdpPointImpl>
 {
 public:
     UdpPointImpl();
 
     boost_ec goStart(std::string const& host, uint16_t port);
-    boost_ec goStart();
     void Shutdown();
     boost_ec Send(std::string const& host, uint16_t port, const void* data, std::size_t bytes);
     boost_ec Send(udp::endpoint destition, const void* data, std::size_t bytes);
@@ -102,9 +47,11 @@ public:
     boost_ec Send(const void* data, size_t bytes);
     udp::endpoint LocalAddr();
     udp::endpoint RemoteAddr();
+    udp_sess_id_t GetSessId();
 
 private:
     virtual void OnSetMaxPackSize() override;
+    boost_ec goStart(udp::endpoint local_endpoint);
     void DoRecv();
 
     static io_service& GetUdpIoService();
@@ -114,11 +61,12 @@ private:
     udp::endpoint remote_addr_;
     shared_ptr<udp::socket> socket_;
     std::atomic<bool> shutdown_{false};
+    std::atomic<bool> init_{false};
     Buffer recv_buf_;
 };
 
 class UdpPoint
-    : public UdpOptions<UdpPoint>
+    : public Options<UdpPoint>, public ServerBase, public ClientBase
 {
 public:
     UdpPoint() : impl_(new UdpPointImpl())
@@ -134,10 +82,6 @@ public:
     boost_ec goStart(std::string const& host, uint16_t port)
     {
         return impl_->goStart(host, port);
-    }
-    boost_ec goStart()
-    {
-        return impl_->goStart();
     }
     void Shutdown()
     {
@@ -166,6 +110,14 @@ public:
     udp::endpoint RemoteAddr()
     {
         return impl_->RemoteAddr();
+    }
+    OptionsBase* GetOptions()
+    {
+        return this;
+    }
+    SessionId GetSessId()
+    {
+        return impl_->GetSessId();
     }
 
 private:

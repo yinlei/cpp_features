@@ -1,0 +1,89 @@
+#include "network.h"
+#include "error.h"
+
+namespace network {
+
+    ProtocolRef::ProtocolRef(Protocol* &proto)
+        : proto_(&proto)
+    {}
+
+    boost_ec Server::goStart(std::string const& url)
+    {
+        boost_ec ec;
+        local_addr_ = endpoint::from_string(url, ec);
+        if (ec) return ec;
+
+        if (local_addr_.proto_ == proto_type::tcp) {
+            protocol_ = tcp::instance();
+        } else if (local_addr_.proto_ == proto_type::udp) {
+            protocol_ = udp::instance();
+        }
+
+        impl_ = protocol_->CreateServer();
+        this->Link(*impl_->GetOptions());
+        return impl_->goStart(local_addr_.address().to_string(), local_addr_.port());
+    }
+    void Server::Shutdown()
+    {
+        impl_.reset();
+    }
+    endpoint Server::LocalAddr()
+    {
+        return local_addr_;
+    }
+    ProtocolRef Server::GetProtocol()
+    {
+        return ProtocolRef(protocol_);
+    }
+
+    boost_ec Client::Connect(std::string const& url)
+    {
+        boost_ec ec;
+        local_addr_ = endpoint::from_string(url, ec);
+        if (ec) return ec;
+
+        if (local_addr_.proto_ == proto_type::tcp) {
+            protocol_ = tcp::instance();
+        } else if (local_addr_.proto_ == proto_type::udp) {
+            protocol_ = udp::instance();
+        }
+
+        impl_ = protocol_->CreateClient();
+        this->Link(*impl_->GetOptions());
+        return impl_->Connect(local_addr_.address().to_string(), local_addr_.port());
+    }
+    void Client::Send(const void* data, size_t bytes, SndCb cb)
+    {
+        if (!protocol_) {
+            if (cb)
+                cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
+            return ;
+        }
+
+        protocol_->Send(GetSessId(), data, bytes, cb);
+    }
+    void Client::Shutdown()
+    {
+        impl_.reset();
+    }
+    endpoint Client::LocalAddr()
+    {
+        return local_addr_;
+    }
+    endpoint Client::RemoteAddr()
+    {
+        if (protocol_ && impl_)
+            return protocol_->RemoteAddr(impl_->GetSessId());
+
+        return endpoint();
+    }
+    ProtocolRef Client::GetProtocol()
+    {
+        return ProtocolRef(protocol_);
+    }
+    SessionId Client::GetSessId()
+    {
+        return impl_ ? impl_->GetSessId() : SessionId();
+    }
+
+} //namespace network

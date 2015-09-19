@@ -10,12 +10,14 @@ using boost_ec = boost::system::error_code;
 
 enum class eNetworkErrorCode : int
 {
-    ec_ok = 0,
-    ec_connecting = 1,
-    ec_estab = 2,
-    ec_shutdown = 3,
-    ec_half = 4,
-    ec_no_destition = 4,
+    ec_ok           = 0,
+    ec_connecting   = 1,
+    ec_estab        = 2,
+    ec_shutdown     = 3,
+    ec_half         = 4,
+    ec_no_destition = 5,
+    ec_timeout      = 6,
+    ec_parse_error  = 7,
 };
 
 class network_error_category

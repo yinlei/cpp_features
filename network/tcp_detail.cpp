@@ -27,7 +27,7 @@ namespace tcp_detail {
         while (it != send_msg_list_.end()) {
             Msg *msg = &*it;
             if (msg->cb)
-                msg->cb(eTcpSndStatus::snd_error);
+                msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
             it = send_msg_list_.erase(it);
             msg->DecrementRef();
         }
@@ -112,7 +112,7 @@ namespace tcp_detail {
                     Msg *msg = *it;
                     if (msg->timeout && !msg->send_half) {
                         if (msg->cb)
-                            msg->cb(eTcpSndStatus::snd_timeout);
+                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
                         it = msgs.erase(it);
                         msg->DecrementRef();
                     } else {
@@ -140,7 +140,7 @@ namespace tcp_detail {
                     for (auto msg : msgs)
                     {
                         if (msg->cb)
-                            msg->cb(eTcpSndStatus::snd_error);
+                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
                         msg->DecrementRef();
                     }
 
@@ -162,7 +162,7 @@ namespace tcp_detail {
                     std::size_t msg_capa = msg->buf.size() - msg->pos;
                     if (msg_capa <= n) {
                         if (msg->cb)
-                            msg->cb(eTcpSndStatus::snd_ok);
+                            msg->cb(boost_ec());
                         it = msgs.erase(it);
                         msg->DecrementRef();
                         n -= msg_capa;
@@ -177,7 +177,7 @@ namespace tcp_detail {
                 {
                     if (msg->timeout && !msg->send_half) {
                         if (msg->cb)
-                            msg->cb(eTcpSndStatus::snd_timeout);
+                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
                         msg->DecrementRef();
                         continue;
                     }
@@ -205,10 +205,10 @@ namespace tcp_detail {
             this->opt_.disconnect_cb_(GetId(), close_ec_);
     }
 
-    void TcpSession::Send(Buffer && buf, SndCb cb)
+    void TcpSession::Send(Buffer && buf, SndCb const& cb)
     {
         if (!shutdown_ref_ && cb)
-            cb(eTcpSndStatus::snd_error);
+            cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
 
         Msg *msg = new Msg(++msg_id_, cb);
         msg->buf = std::move(buf);
@@ -232,13 +232,13 @@ namespace tcp_detail {
                     msg->timeout = true;
                     if (this_ptr->CancelSend(msg))
                     if (msg->cb)
-                    msg->cb(eTcpSndStatus::snd_timeout);
+                    msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
 
                     msg->DecrementRef();
                     });
         }
     }
-    void TcpSession::Send(const void* data, size_t bytes, SndCb cb)
+    void TcpSession::Send(const void* data, size_t bytes, SndCb const& cb)
     {
         Buffer buf(bytes);
         memcpy(&buf[0], data, bytes);
@@ -268,7 +268,7 @@ namespace tcp_detail {
         return !close_ec_;
     }
 
-    SessionId TcpSession::GetId()
+    tcp_sess_id_t TcpSession::GetId()
     {
         return this->shared_from_this();
     }
@@ -296,7 +296,7 @@ namespace tcp_detail {
         for (auto &v : sessions_)
             v.second->Shutdown();
     }
-    void TcpServerImpl::ShutdownServer()
+    void TcpServerImpl::Shutdown()
     {
         shutdown_ = true;
         shutdown(acceptor_->native_handle(), socket_base::shutdown_both);
@@ -342,7 +342,7 @@ namespace tcp_detail {
         }
     }
 
-    void TcpServerImpl::OnSessionClose(SessionId id, boost_ec const& ec)
+    void TcpServerImpl::OnSessionClose(::network::SessionId id, boost_ec const& ec)
     {
         if (opt_.disconnect_cb_)
             opt_.disconnect_cb_(id, ec);
@@ -359,7 +359,7 @@ namespace tcp_detail {
 
     boost_ec TcpClientImpl::Connect(std::string const& host, uint16_t port)
     {
-        if (IsEstab(GetSessId())) return MakeNetworkErrorCode(eNetworkErrorCode::ec_estab);
+        if (sess_ && sess_->IsEstab()) return MakeNetworkErrorCode(eNetworkErrorCode::ec_estab);
         std::unique_lock<co_mutex> lock(connect_mtx_, std::defer_lock);
         if (!lock.try_lock()) return MakeNetworkErrorCode(eNetworkErrorCode::ec_connecting);
 
@@ -378,12 +378,12 @@ namespace tcp_detail {
             .goStart();
         return boost_ec();
     }
-    SessionId TcpClientImpl::GetSessId()
+    tcp_sess_id_t TcpClientImpl::GetSessId()
     {
-        return sess_ ? sess_->GetId() : SessionId();
+        return sess_ ? sess_->GetId() : tcp_sess_id_t();
     }
 
-    void TcpClientImpl::OnSessionClose(SessionId id, boost_ec const& ec)
+    void TcpClientImpl::OnSessionClose(::network::SessionId id, boost_ec const& ec)
     {
         if (opt_.disconnect_cb_)
             opt_.disconnect_cb_(id, ec);
@@ -392,47 +392,9 @@ namespace tcp_detail {
 
     TcpClient::~TcpClient()
     {
-        Shutdown(GetSessId());
-    }
-
-    void Send(SessionId id, Buffer && buf, SndCb cb)
-    {
-        if (!id) {
-            if (cb)
-                cb(eTcpSndStatus::snd_error);
-            return ;
-        }
-
-        id->Send(std::move(buf), cb);
-    }
-    void Send(SessionId id, const void* data, size_t bytes, SndCb cb)
-    {
-        if (!id) {
-            if (cb)
-                cb(eTcpSndStatus::snd_error);
-            return ;
-        }
-
-        id->Send(data, bytes, cb);
-    }
-    void Shutdown(SessionId id)
-    {
-        if (id)
-            id->Shutdown();
-    }
-
-    bool IsEstab(SessionId id)
-    {
-        return id ? id->IsEstab() : false;
-    }
-
-    tcp::endpoint LocalAddr(SessionId id)
-    {
-        return id ? id->local_addr_ : tcp::endpoint();
-    }
-    tcp::endpoint RemoteAddr(SessionId id)
-    {
-        return id ? id->remote_addr_ : tcp::endpoint();
+        auto sess = impl_->GetSessId();
+        if (sess)
+            sess->Shutdown();
     }
 
 } //namespace tcp_detail

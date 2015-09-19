@@ -25,6 +25,15 @@ std::string network_error_category::message(int v) const
 
         case (int)eNetworkErrorCode::ec_half:
             return "send or recv half of package";
+
+        case (int)eNetworkErrorCode::ec_no_destition:
+            return "udp send must be appoint a destition address";
+
+        case (int)eNetworkErrorCode::ec_timeout:
+            return "time out";
+
+        case (int)eNetworkErrorCode::ec_parse_error:
+            return "url parse error";
     }
 
     return "";
