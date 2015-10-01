@@ -1,5 +1,6 @@
 CC=g++
-CFLAGS=-std=c++11 -g -Wall
+CFLAGS=-std=c++11 -O2 -Wall -pg
+#CFLAGS=-std=c++11 -g -Wall -pg -ftest-coverage -fprofile-arcs
 INCLUDE=-I.. -I../../coroutine/unit_test/gtest_unit/gtest/include
 LINK=-L../../coroutine/unit_test/gtest_unit/gtest/lib/.libs -lcoroutine -ldl -lnetwork -lgtest_main -lgtest -lpthread -L..\
 	 -lboost_thread -lboost_system -lboost_regex -lpthread

@@ -51,7 +51,7 @@ namespace network {
     {
         auto udp_id = NETWORK_UPPER_CAST(udp_detail::_udp_sess_id_t)(id.get());
         if (!udp_id) return udp::endpoint();
-        auto asio_endpoint = udp_id->udp_point->RemoteAddr();
+        auto asio_endpoint = udp_id->remote_addr;
         return udp::endpoint(asio_endpoint.address(), asio_endpoint.port());
     }
     boost::shared_ptr<ServerBase> udp::CreateServer()

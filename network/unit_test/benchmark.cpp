@@ -9,7 +9,9 @@ using namespace std;
 using namespace co;
 using namespace network;
 
-std::string g_url = "tcp://127.0.0.1:3050";
+#define MB / (1024 * 1024)
+//#define MB
+std::string g_url = "udp://127.0.0.1:3050";
 int g_thread_count = 4;
 std::atomic<int> g_conn{0};
 std::atomic<unsigned long long> g_server_send{0};
@@ -31,6 +33,10 @@ void start_server(std::string url, bool *bexit)
         .SetReceiveCb(
                 [&, proto](SessionId sess, const void* data, size_t bytes)
                 {
+//                    printf("recv %u bytes from %s:%d\n", (uint32_t)bytes,
+//                        proto->RemoteAddr(sess).address().to_string().c_str(),
+//                        proto->RemoteAddr(sess).port());
+
                     g_server_recv += bytes;
                     if (!bytes)
                         printf("error bytes is zero.\n");
@@ -48,6 +54,8 @@ void start_server(std::string url, bool *bexit)
 
     while (!*bexit)
         sleep(1);
+
+//    printf("server exit\n");
 }
 
 void start_client(std::string url, bool *bexit)
@@ -82,6 +90,8 @@ void start_client(std::string url, bool *bexit)
             return ;
         }
     }
+
+//    printf("client exit\n");
 }
 
 void show_status()
@@ -109,8 +119,8 @@ void show_status()
 
     printf("%6d | %6d | %10llu | %10llu | %10llu | %10llu | %10llu | %10llu | %d\n",
             s_c, (int)g_conn,
-            server_send, server_send_err, server_recv,
-            client_send, client_send_err, client_recv,
+            server_send MB, server_send_err MB, server_recv MB,
+            client_send MB, client_send_err MB, client_recv MB,
             (int)g_max_pack);
 
     last_server_send = g_server_send;
@@ -133,8 +143,10 @@ struct Benchmark : public TestWithParam<int>
 TEST_P(Benchmark, BenchmarkT)
 {
 //    co_sched.GetOptions().debug = network::dbg_session_alive;
+//    co_sched.GetOptions().debug = network::dbg_session_alive | co::dbg_hook;
 
     bool bexit = false;
+//    bool bexit = true;
     go [&]{ start_server(g_url, &bexit); };
     
     for (int i = 0; i < n_; ++i)
@@ -161,4 +173,5 @@ TEST_P(Benchmark, BenchmarkT)
 INSTANTIATE_TEST_CASE_P(
         BenchmarkTest,
         Benchmark,
-        Values(100, 1000, 10000));
+        Values(100));
+//Values(100, 1000, 10000));

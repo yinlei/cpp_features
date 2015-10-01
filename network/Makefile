@@ -1,5 +1,6 @@
 CC=g++
-CFLAGS=-std=c++11 -g -Wall -fPIC
+CFLAGS=-std=c++11 -O2 -Wall -fPIC
+#CFLAGS=-std=c++11 -g -Wall -fPIC -pg
 STATIC_LIB=libnetwork.a
 INCLUDE=-I.
 OBJS=$(patsubst %.cpp, %.o, $(wildcard *.cpp))

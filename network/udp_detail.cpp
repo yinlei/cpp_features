@@ -36,7 +36,7 @@ namespace udp_detail {
     }
     boost_ec UdpPointImpl::goStart(endpoint addr)
     {
-        return goStart(addr);
+        return goStart(udp::endpoint(addr));
     }
     void UdpPointImpl::Shutdown()
     {
@@ -45,6 +45,7 @@ namespace udp_detail {
         shutdown_ = true;
         boost_ec ignore_ec;
         socket_->shutdown(socket_base::shutdown_both, ignore_ec);
+        DebugPrint(dbg_session_alive, "udp::Shutdown");
     }
     void UdpPointImpl::OnSetMaxPackSize()
     {
@@ -54,9 +55,15 @@ namespace udp_detail {
     {
         for (;;)
         {
-            udp::endpoint from_addr;
             boost_ec ec;
-            std::size_t n = socket_->receive_from(buffer(&recv_buf_[0], recv_buf_.size()), from_addr, 0, ec);
+            udp::endpoint from_addr;
+            std::size_t addrlen = from_addr.size();
+            ::boost::asio::detail::socket_ops::buf b{&recv_buf_[0], recv_buf_.size()};
+            std::size_t n = ::boost::asio::detail::socket_ops::recvfrom(socket_->native_handle(),
+                    &b, 1, 0, from_addr.data(), &addrlen, ec);
+            if (!ec)
+                from_addr.resize(addrlen);
+
             if (!ec && opt_.receive_cb_) {
                 udp_sess_id_t sess_id = boost::make_shared<_udp_sess_id_t>(this->shared_from_this(), from_addr);
                 opt_.receive_cb_(sess_id, &recv_buf_[0], n);
@@ -64,6 +71,8 @@ namespace udp_detail {
 
             if (shutdown_) break;
         }
+
+        DebugPrint(dbg_session_alive, "udp::DoRecv exit");
     }
 
     boost_ec UdpPointImpl::Send(std::string const& host, uint16_t port, const void* data, std::size_t bytes)
