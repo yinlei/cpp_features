@@ -30,6 +30,7 @@ int main(int argc, char** argv)
         if (strstr(std::string(data, bytes).c_str(), "shutdown")) {
             proto->Shutdown(id);
         }
+        return bytes;
     });
     boost_ec ec = server.goStart(url);
     if (ec) {

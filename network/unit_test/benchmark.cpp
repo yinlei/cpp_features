@@ -11,7 +11,7 @@ using namespace network;
 
 #define MB / (1024 * 1024)
 //#define MB
-std::string g_url = "udp://127.0.0.1:3050";
+std::string g_url = "tcp://127.0.0.1:3050";
 int g_thread_count = 4;
 std::atomic<int> g_conn{0};
 std::atomic<unsigned long long> g_server_send{0};
@@ -48,6 +48,7 @@ void start_server(std::string url, bool *bexit)
                             if (ec) g_server_send_err += bytes;
                             else g_server_send += bytes;
                         });
+                    return bytes;
                 });
     boost_ec ec = s.goStart(url);
     ASSERT_FALSE(!!ec);
@@ -71,6 +72,7 @@ void start_client(std::string url, bool *bexit)
                     if (ec) g_client_send_err += bytes;
                     else g_client_send += bytes;
                     });
+                return bytes;
             });
     boost_ec ec = c.Connect(url);
     if (ec) {

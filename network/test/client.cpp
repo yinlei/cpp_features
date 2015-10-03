@@ -33,6 +33,7 @@ void foo(std::string url)
         };
     }).SetDisconnectedCb(&on_disconnect).SetReceiveCb([](SessionId id, const char* data, size_t bytes){
         printf("receive: %.*s\n", (int)bytes, data);
+        return bytes;
     });
     boost_ec ec = client.Connect(url);
     if (ec) {

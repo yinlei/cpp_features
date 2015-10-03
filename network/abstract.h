@@ -93,7 +93,7 @@ namespace network {
 
     typedef std::vector<char> Buffer;
     typedef boost::function<void(boost_ec const&)> SndCb;
-    typedef boost::function<void(SessionId, const char* data, size_t bytes)> ReceiveCb;
+    typedef boost::function<size_t(SessionId, const char* data, size_t bytes)> ReceiveCb;
 
     // ----- tcp protocol effect only ------
     typedef boost::function<void(SessionId)> ConnectedCb;

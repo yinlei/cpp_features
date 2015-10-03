@@ -51,10 +51,17 @@ namespace tcp_detail {
         auto this_ptr = this->shared_from_this();
         go [=]{
             auto holder = this_ptr;
+            size_t pos = 0;
             for (;;)
             {
                 boost_ec ec;
-                std::size_t n = socket_->read_some(buffer(recv_buf_), ec);
+                std::size_t n = 0;
+                if (pos >= recv_buf_.size()) {
+                    ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+                } else {
+                    n = socket_->read_some(buffer(&recv_buf_[pos], recv_buf_.size() - pos), ec);
+                }
+
                 if (ec) {
                     SetCloseEc(ec);
                     boost_ec ignore_ec;
@@ -70,8 +77,13 @@ namespace tcp_detail {
                     return ;
 //                } else if (!n) {
 //                    printf("not error but n is 0. recv_buf size: %d, socket: %d\n", (int)recv_buf_.size(), socket_->native_handle());
-                } else if (n > 0 && this->opt_.receive_cb_)
-                    this->opt_.receive_cb_(GetId(), recv_buf_.data(), n);
+                } else if (n > 0 && this->opt_.receive_cb_) {
+                    size_t consume = this->opt_.receive_cb_(GetId(), recv_buf_.data(), n + pos);
+                    assert(consume <= n + pos);
+                    pos = n + pos - consume;
+                    if (pos > 0)
+                        memcpy(&recv_buf_[0], &recv_buf_[consume], pos);
+                }
             }
         };
     }
