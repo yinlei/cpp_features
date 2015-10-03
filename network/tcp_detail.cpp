@@ -62,6 +62,24 @@ namespace tcp_detail {
                     n = socket_->read_some(buffer(&recv_buf_[pos], recv_buf_.size() - pos), ec);
                 }
 
+                if (!ec) {
+                    if(n > 0) {
+                        if (this->opt_.receive_cb_) {
+                            size_t consume = this->opt_.receive_cb_(GetId(), recv_buf_.data(), n + pos);
+                            if (consume == (size_t)-1)
+                                ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+                            else {
+                                assert(consume <= n + pos);
+                                pos = n + pos - consume;
+                                if (pos > 0)
+                                    memcpy(&recv_buf_[0], &recv_buf_[consume], pos);
+                            }
+                        } else {
+                            pos += n;
+                        }
+                    }
+                }
+
                 if (ec) {
                     SetCloseEc(ec);
                     boost_ec ignore_ec;
@@ -75,15 +93,7 @@ namespace tcp_detail {
                     DebugPrint(dbg_session_alive, "TcpSession receive shutdown %s:%d",
                             remote_addr_.address().to_string().c_str(), remote_addr_.port());
                     return ;
-//                } else if (!n) {
-//                    printf("not error but n is 0. recv_buf size: %d, socket: %d\n", (int)recv_buf_.size(), socket_->native_handle());
-                } else if (n > 0 && this->opt_.receive_cb_) {
-                    size_t consume = this->opt_.receive_cb_(GetId(), recv_buf_.data(), n + pos);
-                    assert(consume <= n + pos);
-                    pos = n + pos - consume;
-                    if (pos > 0)
-                        memcpy(&recv_buf_[0], &recv_buf_[consume], pos);
-                }
+                } 
             }
         };
     }
