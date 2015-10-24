@@ -1,4 +1,5 @@
 TODO:
+增加适用于协程版的shared_ptr.(使用shared_ptr指向的对象时, 协程切换, 其他协程可能删除此对象)
 Work Stealing...
 HOOK select poll时, 正确处理文件句柄
 
