@@ -20,6 +20,8 @@ namespace network {
             *protocol_ = tcp::instance();
         } else if (local_addr_.proto_ == proto_type::udp) {
             *protocol_ = udp::instance();
+        } else {
+            return MakeNetworkErrorCode(eNetworkErrorCode::ec_unsupport_protocol);
         }
 
         impl_ = (*protocol_)->CreateServer();
@@ -52,6 +54,8 @@ namespace network {
             *protocol_ = tcp::instance();
         } else if (local_addr_.proto_ == proto_type::udp) {
             *protocol_ = udp::instance();
+        } else {
+            return MakeNetworkErrorCode(eNetworkErrorCode::ec_unsupport_protocol);
         }
 
         impl_ = (*protocol_)->CreateClient();

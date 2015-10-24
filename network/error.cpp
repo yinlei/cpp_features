@@ -34,6 +34,9 @@ std::string network_error_category::message(int v) const
 
         case (int)eNetworkErrorCode::ec_parse_error:
             return "url parse error";
+
+        case (int)eNetworkErrorCode::ec_unsupport_protocol:
+            return "unsupport protocol";
     }
 
     return "";

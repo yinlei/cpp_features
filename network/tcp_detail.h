@@ -185,7 +185,8 @@ public:
 
     boost_ec Connect(endpoint addr)
     {
-        return impl_->Connect(addr);
+        auto impl = impl_;
+        return impl->Connect(addr);
     }
     SessionId GetSessId()
     {

@@ -8,6 +8,11 @@ namespace network {
 
     struct ProtocolRef
     {
+        explicit operator bool() const
+        {
+            return proto_ && *proto_;
+        }
+
         Protocol* operator->() const
         {
             return *proto_;

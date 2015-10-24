@@ -37,13 +37,15 @@ namespace tcp_detail {
     void TcpSession::goStart()
     {
         auto this_ptr = this->shared_from_this();
+        if (opt_.connect_cb_)
+            opt_.connect_cb_(GetId());
+
         go [=] {
             auto holder = this_ptr;
-            if (opt_.connect_cb_)
-                opt_.connect_cb_(GetId());
             goReceive();
             goSend();
         };
+
     }
 
     void TcpSession::goReceive()

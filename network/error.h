@@ -18,6 +18,7 @@ enum class eNetworkErrorCode : int
     ec_no_destition = 5,
     ec_timeout      = 6,
     ec_parse_error  = 7,
+    ec_unsupport_protocol  = 8,
 };
 
 class network_error_category
