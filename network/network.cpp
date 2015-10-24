@@ -42,10 +42,14 @@ namespace network {
     }
 
     Client::Client()
-        : protocol_(new Protocol*(nullptr))
+        : protocol_(new Protocol*(nullptr)), connect_mtx_(new co_mutex)
     {}
     boost_ec Client::Connect(std::string const& url)
     {
+        std::unique_lock<co_mutex> lock(*connect_mtx_, std::defer_lock);
+        if (!lock.try_lock()) return MakeNetworkErrorCode(eNetworkErrorCode::ec_connecting);
+        if (impl_ && protocol_ && (*protocol_)->IsEstab(impl_->GetSessId())) return MakeNetworkErrorCode(eNetworkErrorCode::ec_estab);
+
         boost_ec ec;
         local_addr_ = endpoint::from_string(url, ec);
         if (ec) return ec;

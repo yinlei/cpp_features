@@ -61,6 +61,7 @@ namespace network {
     private:
         boost::shared_ptr<Protocol*> protocol_;
         boost::shared_ptr<ClientBase> impl_;
+        boost::shared_ptr<co_mutex> connect_mtx_;
         endpoint local_addr_;
     };
 
