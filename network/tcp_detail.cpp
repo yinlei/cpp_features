@@ -48,6 +48,18 @@ namespace tcp_detail {
 
     }
 
+    static std::string to_hex(const char* data, size_t len)                     
+    {                                                                              
+        static const char hex[] = "0123456789abcdef";                              
+        std::string str;                                                           
+        for (size_t i = 0; i < len; ++i) {                                         
+            str += hex[(unsigned char)data[i] >> 4];                               
+            str += hex[(unsigned char)data[i] & 0xf];                              
+            str += ' ';                                                            
+        }                                                                          
+        return str;                                                                
+    }                                                                              
+
     void TcpSession::goReceive()
     {
         auto this_ptr = this->shared_from_this();
@@ -66,6 +78,7 @@ namespace tcp_detail {
 
                 if (!ec) {
                     if(n > 0) {
+//                        printf("receive %u bytes: %s\n", (unsigned)n, to_hex(&recv_buf_[pos], n).c_str());
                         if (this->opt_.receive_cb_) {
                             size_t consume = this->opt_.receive_cb_(GetId(), recv_buf_.data(), n + pos);
                             if (consume == (size_t)-1)
