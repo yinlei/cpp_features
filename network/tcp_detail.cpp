@@ -59,7 +59,7 @@ namespace tcp_detail {
                 boost_ec ec;
                 std::size_t n = 0;
                 if (pos >= recv_buf_.size()) {
-                    ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+                    ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_recv_overflow);
                 } else {
                     n = socket_->read_some(buffer(&recv_buf_[pos], recv_buf_.size() - pos), ec);
                 }
@@ -69,7 +69,7 @@ namespace tcp_detail {
                         if (this->opt_.receive_cb_) {
                             size_t consume = this->opt_.receive_cb_(GetId(), recv_buf_.data(), n + pos);
                             if (consume == (size_t)-1)
-                                ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+                                ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_data_parse_error);
                             else {
                                 assert(consume <= n + pos);
                                 pos = n + pos - consume;

@@ -46,6 +46,8 @@ namespace udp_detail {
         boost_ec ignore_ec;
         socket_->shutdown(socket_base::shutdown_both, ignore_ec);
         DebugPrint(dbg_session_alive, "udp::Shutdown");
+        if (opt_.disconnect_cb_)
+            opt_.disconnect_cb_(GetSessId(), MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
     }
     void UdpPointImpl::OnSetMaxPackSize()
     {
@@ -100,8 +102,12 @@ namespace udp_detail {
             if (ec) return ec;
         }
         socket_->connect(addr, ec);
-        if (!ec)
+        if (!ec) {
             remote_addr_ = addr;
+
+            if (opt_.connect_cb_)
+                opt_.connect_cb_(GetSessId());
+        }
         return ec;
     }
     boost_ec UdpPointImpl::Send(const void* data, size_t bytes)

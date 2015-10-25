@@ -104,7 +104,7 @@ namespace network {
     endpoint Protocol::endpoint::from_string(std::string const& url, boost_ec & ec)
     {
         if (url.empty()) {
-            ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+            ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_url_parse_error);
             return endpoint();
         }
 
@@ -112,7 +112,7 @@ namespace network {
         boost::smatch result;                                                          
         bool ok = boost::regex_match(url, result, re);
         if (!ok) {
-            ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_parse_error);
+            ec = MakeNetworkErrorCode(eNetworkErrorCode::ec_url_parse_error);
             return endpoint();
         }
 

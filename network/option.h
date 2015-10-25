@@ -3,10 +3,14 @@
 
 namespace network {
 
-struct OptionsData
+struct OptionsUser
 {
     int sndtimeo_ = 0;
     uint32_t max_pack_size_ = 4096;
+};
+
+struct OptionsData : public OptionsUser
+{
     ConnectedCb connect_cb_;
     ReceiveCb receive_cb_;
     DisconnectedCb disconnect_cb_;
