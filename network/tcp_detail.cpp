@@ -348,7 +348,8 @@ namespace tcp_detail {
     void TcpServerImpl::Shutdown()
     {
         shutdown_ = true;
-        shutdown(acceptor_->native_handle(), socket_base::shutdown_both);
+        if (acceptor_)
+            shutdown(acceptor_->native_handle(), socket_base::shutdown_both);
         ShutdownAll();
     }
     void TcpServerImpl::Accept()
