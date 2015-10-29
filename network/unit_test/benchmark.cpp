@@ -102,7 +102,7 @@ void show_status()
     if (s_c++ % 10 == 0) {
         // print title
         printf("--------------------------------------------------------------------------------------------------------\n");
-        printf(" index |  conn  |   s_send   | s_send_err |   s_recv   |   c_send   | c_send_err |   c_recv   | max_pack\n");
+        printf(" index |  conn  |   s_send   | s_send_err |   s_recv   |   c_send   | c_send_err |   c_recv   |   QPS   | max_pack\n");
     }
 
     static unsigned long long last_server_send{0};
@@ -119,11 +119,11 @@ void show_status()
     unsigned long long client_send_err = g_client_send_err - last_client_send_err;
     unsigned long long client_recv = g_client_recv - last_client_recv;
 
-    printf("%6d | %6d | %10llu | %10llu | %10llu | %10llu | %10llu | %10llu | %d\n",
+    printf("%6d | %6d | %10llu | %10llu | %10llu | %10llu | %10llu | %10llu |%8llu | %d\n",
             s_c, (int)g_conn,
             server_send MB, server_send_err MB, server_recv MB,
             client_send MB, client_send_err MB, client_recv MB,
-            (int)g_max_pack);
+            client_recv / g_max_pack, (int)g_max_pack);
 
     last_server_send = g_server_send;
     last_server_send_err = g_server_send_err;
