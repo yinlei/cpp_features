@@ -222,6 +222,7 @@ namespace tcp_detail {
                         continue;
                     }
 
+                    std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
                     send_msg_list_.push_front(*msg);
                 }
             }
