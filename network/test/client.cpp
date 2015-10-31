@@ -31,10 +31,13 @@ void foo(std::string url)
                 ::sleep(3);
             }
         };
-    }).SetDisconnectedCb(&on_disconnect).SetReceiveCb([](SessionId id, const char* data, size_t bytes){
-        printf("receive: %.*s\n", (int)bytes, data);
-        return bytes;
-    });
+    })
+    .SetDisconnectedCb(&on_disconnect)
+    .SetReceiveCb([](SessionId id, const char* data, size_t bytes){
+            printf("receive: %.*s\n", (int)bytes, data);
+            return bytes;
+        });
+
     boost_ec ec = client.Connect(url);
     if (ec) {
         printf("connect error %d:%s\n", ec.value(), ec.message().c_str());

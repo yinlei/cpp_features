@@ -5,6 +5,7 @@
 #include <atomic>
 #include <boost/asio.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/make_shared.hpp>
 #include <boost/smart_ptr/enable_shared_from_this.hpp>
 #include <boost/intrusive/list.hpp>
 #include <boost/variant.hpp>
@@ -34,27 +35,19 @@ class TcpSession
 {
 public:
     struct Msg
-        : public boost::intrusive::list_base_hook<
-            boost::intrusive::link_mode<boost::intrusive::auto_unlink>
-          >
     {
-        bool timeout = false;
+        std::atomic<bool> timeout{false};
         bool send_half = false;
         std::size_t pos = 0;
-        std::atomic<int> use_ref;
         uint64_t id;
         SndCb cb;
         co_timer_id tid;
         Buffer buf;
 
-        Msg(uint64_t uid, SndCb ocb) : use_ref{1}, id(uid), cb(ocb) {}
-        void IncrementRef() { ++use_ref; }
-        void DecrementRef() { if (--use_ref == 0) delete this; }
+        Msg(uint64_t uid, SndCb ocb) : id(uid), cb(ocb) {}
     };
-    typedef boost::intrusive::list<
-            Msg,
-            boost::intrusive::constant_time_size<false>
-        > MsgList;
+    typedef co_chan<boost::shared_ptr<Msg>> MsgChan;
+    typedef std::list<boost::shared_ptr<Msg>> MsgList;
 
     explicit TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder, uint32_t max_pack_size);
     ~TcpSession();
@@ -70,16 +63,14 @@ private:
     void goSend();
     void SetCloseEc(boost_ec const& ec);
     void OnClose();
-    bool CancelSend(Msg* msg);
 
 private:
     shared_ptr<tcp::socket> socket_;
     shared_ptr<LifeHolder> holder_;
     Buffer recv_buf_;
     uint64_t msg_id_;
-    co_mutex send_msg_list_mutex_;
-    co_chan<void> send_msg_cond_;
-    MsgList send_msg_list_;
+    MsgChan msg_chan_;
+    MsgList msg_send_list_;
     std::atomic<int> shutdown_ref_;
     co_mutex close_ec_mutex_;
     boost_ec close_ec_;

@@ -12,7 +12,7 @@ namespace tcp_detail {
     }
 
     TcpSession::TcpSession(shared_ptr<tcp::socket> s, shared_ptr<LifeHolder> holder, uint32_t max_pack_size)
-        : socket_(s), holder_(holder), recv_buf_(max_pack_size), send_msg_cond_(1), shutdown_ref_{2}
+        : socket_(s), holder_(holder), recv_buf_(max_pack_size), msg_chan_(-1), shutdown_ref_{2}
     {
         boost_ec ignore_ec;
         local_addr_ = s->local_endpoint(ignore_ec);
@@ -23,15 +23,6 @@ namespace tcp_detail {
     {
         DebugPrint(dbg_session_alive, "TcpSession destruct %s:%d",
                 remote_addr_.address().to_string().c_str(), remote_addr_.port());
-        std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
-        auto it = send_msg_list_.begin();
-        while (it != send_msg_list_.end()) {
-            Msg *msg = &*it;
-            if (msg->cb)
-                msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
-            it = send_msg_list_.erase(it);
-            msg->DecrementRef();
-        }
     }
 
     void TcpSession::goStart()
@@ -99,11 +90,8 @@ namespace tcp_detail {
                     SetCloseEc(ec);
                     boost_ec ignore_ec;
                     socket_->shutdown(socket_base::shutdown_both, ignore_ec);
-                    if (--shutdown_ref_ == 0) {
+                    if (--shutdown_ref_ == 0)
                         OnClose();
-                    } else {
-                        send_msg_cond_.TryPush(nullptr);
-                    }
 
                     DebugPrint(dbg_session_alive, "TcpSession receive shutdown %s:%d",
                             remote_addr_.address().to_string().c_str(), remote_addr_.port());
@@ -120,56 +108,56 @@ namespace tcp_detail {
             auto holder = this_ptr;
             for (;;)
             {
-                std::list<Msg*> msgs;
-
-                {
-                    std::unique_lock<co_mutex> lock(send_msg_list_mutex_);
-                    if (send_msg_list_.empty()) {
-                        lock.unlock();
-                        send_msg_cond_ >> nullptr;
-                        if (shutdown_ref_ == 1) {
-                            --shutdown_ref_;
-                            DebugPrint(dbg_session_alive, "TcpSession send shutdown with cond %s:%d",
-                                    remote_addr_.address().to_string().c_str(), remote_addr_.port());
-                            OnClose();
-                            return ;
-                        }
-                        lock.lock();
-                    }
-
-                    auto it = send_msg_list_.begin();
-                    for (int i = 0; it != send_msg_list_.end() && i < 128; ++i)
-                    {
-                        Msg* msg = &*it;
-                        msgs.push_back(msg);
-                        it = send_msg_list_.erase(it);
-                    }
+                if (shutdown_ref_ == 1) {
+                    --shutdown_ref_;
+                    DebugPrint(dbg_session_alive, "TcpSession send shutdown with cond %s:%d",
+                            remote_addr_.address().to_string().c_str(), remote_addr_.port());
+                    OnClose();
+                    return ;
                 }
 
-                // Delete timeout msg.
-                auto it = msgs.begin();
-                while (it != msgs.end()) {
-                    Msg *msg = *it;
+                static const int c_multi = 1024;
+
+                for (int i = 0; i < c_multi; ++i)
+                {
+                    boost::shared_ptr<Msg> msg;
+                    if (!msg_chan_.TryPop(msg)) break;
+                    if (msg->timeout) {
+                        if (msg->cb)
+                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
+                    } else
+                        msg_send_list_.push_back(msg);
+                }
+
+                if (msg_send_list_.empty()) {
+                    co_yield;
+                    continue;
+                }
+
+                // Make buffers
+                std::vector<const_buffer> buffers(std::min<int>(msg_send_list_.size(), c_multi));
+                int i = 0;
+                auto it = msg_send_list_.begin();
+                while (it != msg_send_list_.end())
+                {
+                    auto &msg = *it;
                     if (msg->timeout && !msg->send_half) {
                         if (msg->cb)
                             msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
-                        it = msgs.erase(it);
-                        msg->DecrementRef();
-                    } else {
-                        ++it;
+                        it = msg_send_list_.erase(it);
+                        continue;
                     }
-                }
 
-                if (msgs.empty())
-                    continue;
-
-                // Make buffers
-                std::vector<const_buffer> buffers(msgs.size());
-                int i = 0;
-                for (auto it = msgs.begin(); it != msgs.end(); ++it, ++i)
-                {
-                    Msg *msg = *it;
+                    if (i >= c_multi) break;
                     buffers[i] = buffer(&msg->buf[msg->pos], msg->buf.size() - msg->pos);
+                    ++it;
+                    ++i;
+                }
+                buffers.resize(i);
+
+                if (buffers.empty()) {
+                    co_yield;
+                    continue;
                 }
 
                 // Send Once
@@ -177,12 +165,6 @@ namespace tcp_detail {
                 std::size_t n = socket_->write_some(buffers, ec);
                 if (ec) {
                     SetCloseEc(ec);
-                    for (auto msg : msgs)
-                    {
-                        if (msg->cb)
-                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
-                        msg->DecrementRef();
-                    }
 
                     boost_ec ignore_ec;
                     socket_->shutdown(socket_base::shutdown_both, ignore_ec);
@@ -196,34 +178,20 @@ namespace tcp_detail {
                 }
 
                 // Remove sended msg. restore send-half and non-send msgs.
-                it = msgs.begin();
-                while (it != msgs.end() && n > 0) {
-                    Msg *msg = *it;
+                it = msg_send_list_.begin();
+                while (it != msg_send_list_.end() && n > 0) {
+                    auto &msg = *it;
                     std::size_t msg_capa = msg->buf.size() - msg->pos;
                     if (msg_capa <= n) {
                         if (msg->cb)
                             msg->cb(boost_ec());
-                        it = msgs.erase(it);
-                        msg->DecrementRef();
+                        it = msg_send_list_.erase(it);
                         n -= msg_capa;
                     } else if (msg_capa > n) {
                         msg->pos += n;
                         msg->send_half = true;
                         break;
                     }
-                }
-
-                for (auto msg : msgs)
-                {
-                    if (msg->timeout && !msg->send_half) {
-                        if (msg->cb)
-                            msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
-                        msg->DecrementRef();
-                        continue;
-                    }
-
-                    std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
-                    send_msg_list_.push_front(*msg);
                 }
             }
         };
@@ -242,13 +210,26 @@ namespace tcp_detail {
                 remote_addr_.address().to_string().c_str(), remote_addr_.port());
         boost_ec ignore_ec;
         socket_->close(ignore_ec);
+
+        for (;;) {
+            boost::shared_ptr<Msg> msg;
+            if (!msg_chan_.TryPop(msg)) break;
+            if (msg->cb)
+                msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
+        }
+
+        for (auto &msg : msg_send_list_)
+            if (msg->cb)
+                msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
+        msg_send_list_.clear();
+
         if (this->opt_.disconnect_cb_)
             this->opt_.disconnect_cb_(GetId(), close_ec_);
     }
 
     void TcpSession::Send(Buffer && buf, SndCb const& cb)
     {
-        if (!shutdown_ref_) {
+        if (shutdown_ref_ < 2) {
             if (cb)
                 cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_shutdown));
             return ;
@@ -260,32 +241,23 @@ namespace tcp_detail {
             return ;
         }
 
-        Msg *msg = new Msg(++msg_id_, cb);
-        msg->buf = std::move(buf);
-
-        co::RefGuard<Msg> ref_guard(msg);
-
-        {
-            std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
-            bool cond = false;
-            if (send_msg_list_.empty())
-                cond = true;
-            send_msg_list_.push_back(*msg);
-            if (cond)
-                send_msg_cond_.TryPush(nullptr);
+        auto msg = boost::make_shared<Msg>(++msg_id_, cb);
+        msg->buf.swap(buf);
+        if (opt_.sndtimeo_) {
+            auto this_ptr = this->shared_from_this();
+            msg->tid = co_timer_add(std::chrono::milliseconds(opt_.sndtimeo_),
+                    [=]{
+                        msg->timeout = true;
+                    });
         }
 
-        if (opt_.sndtimeo_) {
-            msg->IncrementRef();
-            auto this_ptr = this->shared_from_this();
-            msg->tid = co_timer_add(std::chrono::milliseconds(opt_.sndtimeo_), [=]{
-                    msg->timeout = true;
-                    if (this_ptr->CancelSend(msg))
-                    if (msg->cb)
-                    msg->cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_timeout));
+        if (!msg_chan_.TryPush(msg)) {
+            if (msg->tid)
+                co_timer_cancel(msg->tid);
 
-                    msg->DecrementRef();
-                    });
+            if (cb)
+                cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_send_overflow));
+            return ;
         }
     }
     void TcpSession::Send(const void* data, size_t bytes, SndCb const& cb)
@@ -293,17 +265,6 @@ namespace tcp_detail {
         Buffer buf(bytes);
         memcpy(&buf[0], data, bytes);
         Send(std::move(buf), cb);
-    }
-
-    bool TcpSession::CancelSend(Msg* msg)
-    {
-        {
-            std::lock_guard<co_mutex> lock(send_msg_list_mutex_);
-            if (!msg->is_linked()) return false;
-            msg->unlink();
-        }
-        msg->DecrementRef();
-        return true;
     }
 
     void TcpSession::Shutdown()

@@ -21,6 +21,7 @@ enum class eNetworkErrorCode : int
     ec_data_parse_error  = 8,
     ec_unsupport_protocol  = 9,
     ec_recv_overflow = 10,
+    ec_send_overflow = 11,
 };
 
 class network_error_category

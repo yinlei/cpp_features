@@ -175,5 +175,5 @@ TEST_P(Benchmark, BenchmarkT)
 INSTANTIATE_TEST_CASE_P(
         BenchmarkTest,
         Benchmark,
-        Values(100));
+        Values(1, 100));
 //Values(100, 1000, 10000));
