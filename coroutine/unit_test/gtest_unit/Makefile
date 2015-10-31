@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -g -Wall
+CFLAGS=-std=c++11 -O3 -Wall
 INCLUDE=-Igtest/include -I/usr/include/coroutine -I../.. -I../../linux
 LINK=-Lgtest/lib/.libs -lcoroutine -ldl -lgtest_main -lgtest -lpthread -L../..\
 	 -lboost_thread -lboost_system -lpthread
