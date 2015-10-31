@@ -36,7 +36,6 @@ TEST_P(Times, testBm)
 {
 //    g_Scheduler.GetOptions().debug = dbg_sleepblock;
 
-    // create coroutines
     {
         stdtimer st(tc_, "Create coroutine");
         for (int i = 0; i < tc_; ++i) {
@@ -66,6 +65,33 @@ TEST_P(Times, testBm)
     {
         stdtimer st(tc_, "Channel");
         g_Scheduler.RunUntilNoTask();
+    }
+
+    {
+        stdtimer st(tc_, "Create Timer");
+        for (int i = 0; i < tc_; ++i)
+            co_timer_add(std::chrono::nanoseconds(i), []{});
+    }
+
+    {
+        std::vector<co_timer_id> id_list;
+        id_list.reserve(tc_);
+        for (int i = 0; i < tc_; ++i)
+            id_list.push_back(co_timer_add(std::chrono::nanoseconds(i), []{}));
+
+        stdtimer st(tc_, "Delete Timer");
+        for (int i = 0; i < tc_; ++i)
+            co_timer_cancel(id_list[i]);
+    }
+
+//    g_Scheduler.GetOptions().debug = co::dbg_timer;
+    {
+        bool *flag = new bool(true);
+        auto id = co_timer_add(std::chrono::milliseconds(1), [=]{ *flag = false; });
+
+        stdtimer st(tc_, "Process Timer");
+        while (*flag)
+            g_Scheduler.Run();
     }
 }
 
