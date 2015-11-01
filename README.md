@@ -65,6 +65,9 @@ coroutine有以下特点：
      栈上对象会被保存到另外一块内存中，因此会失效，此时通过保存的地址访问栈上对象是一种未定义行为。
      有共享需求的对象请将其置于堆上或使用channel。
 
+##### 高层封装：
+     * 1.基于coroutine编写的网络库，在network目录中，支持udp/tcp协议
+     * 2.基于coroutine和network编写的高性能通用RPC框架Ucorf，开源地址：https://github.com/yyzybb537/ucorf
 
 
 
