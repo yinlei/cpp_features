@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-std=c++11 -O3 -Wall
-INCLUDE=-Igtest/include -I/usr/include/coroutine -I../.. -I../../linux
-LINK=-Lgtest/lib/.libs -lcoroutine -ldl -lgtest_main -lgtest -lpthread -L../..\
+INCLUDE=-Igtest/include -I/usr/local/include/coroutine
+LINK=-Lgtest/lib/.libs -lcoroutine -ldl -lgtest_main -lgtest -lpthread \
 	 -lboost_thread -lboost_system -lpthread
 STATIC=-static -static-libgcc -static-libstdc++
 TARGET=$(patsubst %.cpp, %.t, $(wildcard *.cpp)) $(patsubst %.cpp, s_%.t, $(wildcard *.cpp))

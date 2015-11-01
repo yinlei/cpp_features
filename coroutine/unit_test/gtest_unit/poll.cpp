@@ -164,7 +164,7 @@ TEST(Poll, TimeoutIs1)
 
 TEST(Poll, MultiThreads)
 {
-    for (int i = 0; i < 1000; ++i)
+    for (int i = 0; i < 100; ++i)
         go [] {
             pollfd fds[1];
             CreatePollfds(fds);
