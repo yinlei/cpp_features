@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
+###################################################################################
 project(coroutine)
 SET(CMAKE_CXX_COMPILER "g++")
 set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -Werror -fPIC")
@@ -28,3 +29,4 @@ install(TARGETS ${STATIC_T} ${SHARED_T} LIBRARY DESTINATION "lib" ARCHIVE DESTIN
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/ DESTINATION "include/coroutine" FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/linux/ DESTINATION "include/coroutine" FILES_MATCHING PATTERN "*.h")
 
+add_subdirectory("${PROJECT_SOURCE_DIR}/network")

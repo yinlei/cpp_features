@@ -39,17 +39,17 @@ namespace tcp_detail {
 
     }
 
-    static std::string to_hex(const char* data, size_t len)                     
-    {                                                                              
-        static const char hex[] = "0123456789abcdef";                              
-        std::string str;                                                           
-        for (size_t i = 0; i < len; ++i) {                                         
-            str += hex[(unsigned char)data[i] >> 4];                               
-            str += hex[(unsigned char)data[i] & 0xf];                              
-            str += ' ';                                                            
-        }                                                                          
-        return str;                                                                
-    }                                                                              
+//    static std::string to_hex(const char* data, size_t len)                     
+//    {                                                                              
+//        static const char hex[] = "0123456789abcdef";                              
+//        std::string str;                                                           
+//        for (size_t i = 0; i < len; ++i) {                                         
+//            str += hex[(unsigned char)data[i] >> 4];                               
+//            str += hex[(unsigned char)data[i] & 0xf];                              
+//            str += ' ';                                                            
+//        }                                                                          
+//        return str;                                                                
+//    }                                                                              
 
     void TcpSession::goReceive()
     {
