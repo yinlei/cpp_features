@@ -60,7 +60,9 @@ coroutine有以下特点：
  
         1.使用git submodule update --init下载子模块
         
-        2.进入coroutine/win_patch/VS2015目录, 使用VS2015打开coroutine.sln，修改引用的boost库目录
+        2.进入coroutine/win_patch/VS2015目录, 使用VS2015打开coroutine.sln，只需编译coroutine工程即可。
+        
+          不必编译整个解决方案，其中的测试工程是依赖boost的，如果要编译请调整相关设置
         
         3.编译coroutine项目（默认的工程配置暂时只配置了x64-Debug-mt版，需要其他版本请自行修改工程配置）
         
