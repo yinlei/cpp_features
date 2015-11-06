@@ -13,9 +13,9 @@ coroutine是一个使用C++11编写的调度式stackful协程库,
 
     Linux   (GCC4.8+)
     
-    Windows (VS2013 +)
+    Win7-64bit (VS2013/2015)
 
-使用coroutine编写并行程序，即可以像go、erlang这些并发语言一样
+使用coroutine编写并行程序，即可以像golang、erlang这些并发语言一样
 开发迅速且逻辑简洁，又有C++原生的性能优势，鱼和熊掌从此可以兼得。
 
 coroutine有以下特点：
@@ -60,9 +60,13 @@ coroutine有以下特点：
  
         1.使用git submodule update --init下载子模块
         
-        2.进入coroutine/win_patch/VS2015目录, 使用VS2015打开coroutine.sln，只需编译coroutine工程即可。
+        2.进入coroutine/win_patch/VS2015目录, 打开coroutine.sln，不必编译整个解决方案，只需编译coroutine工程即可。
         
-          不必编译整个解决方案，其中的测试工程是依赖boost的，如果要编译请调整相关设置
+          其中的测试工程是依赖boost-x64的，如果要编译请先编译64bit的boost库:
+
+            编译参数：bjam.exe address-model=64 --build-type=compelete
+            
+          至少编译system和thread两个库，然后调整工程设置中的引用boost的路径。
         
         3.编译coroutine项目（默认的工程配置暂时只配置了x64-Debug-mt版，需要其他版本请自行修改工程配置）
         
