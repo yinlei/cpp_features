@@ -209,7 +209,7 @@ namespace http
 
     void url::parse(std::string s)
     {
-        static boost::regex re("^(\\w+)://([^:/]*)(:\\d+)?(/[^\\?]*)?(\\?.*)?$");
+        static boost::regex re("^(\\w+)://([^:/]+)(:\\d+)?(/[^\\?]*)?(\\?.*)?$");
         clear();
         boost::smatch results;
         bool ok = boost::regex_match(s, results, re);
