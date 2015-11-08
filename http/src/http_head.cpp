@@ -21,6 +21,8 @@ namespace http
         parse_node_ = parse_root();
         std::string empty_s;
         parse_buf_.swap(empty_s);
+        std::string empty_s2;
+        parse_buf2_.swap(empty_s);
     }
 
     http_head::eHttpHeadType http_head::type() const

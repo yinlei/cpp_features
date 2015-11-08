@@ -14,9 +14,20 @@ namespace http
         struct is_strless
         {
             template <typename S>
-            bool operator()(S const& left, S const& right) const
+            inline bool operator()(S const& left, S const& right) const
             {
-                return boost::to_upper_copy(left) < boost::to_upper_copy(right);
+                if (left.size() != right.size())
+                    return left.size() < right.size();
+
+                for (size_t i = 0; i < left.size(); ++i)
+                {
+                    char l = std::toupper(left[i]);
+                    char r = std::toupper(right[i]);
+                    if (l != r)
+                        return l < r;
+                }
+
+                return false;
             }
         };
         typedef std::multimap<std::string, std::string, is_strless> ICaseMap;
