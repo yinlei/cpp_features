@@ -11,22 +11,31 @@ namespace http
     class http_head
     {
     public:
-        typedef std::multimap<std::string, std::string, boost::is_iless> ICaseMap;
+        struct is_strless
+        {
+            template <typename S>
+            bool operator()(S const& left, S const& right) const
+            {
+                return boost::to_upper_copy(left) < boost::to_upper_copy(right);
+            }
+        };
+        typedef std::multimap<std::string, std::string, is_strless> ICaseMap;
 
         enum class eHttpHeadType
         {
+            indeterminate = 0,
             request,
             response,
         };
 
-        explicit http_head(eHttpHeadType type);
+        explicit http_head(eHttpHeadType type = eHttpHeadType::request);
 
         void clear();
 
         /// --------------------- parse ---------------------
         enum class eParseState
         {
-            indeterminate,
+            indeterminate = 0,
             error,
             done
         };
@@ -40,9 +49,8 @@ namespace http
 
         std::string to_string() const;
 
-        bool ok() const;
-        explicit operator bool() const;
-        std::string error() const;
+        eHttpHeadType type() const;
+        void set_type(eHttpHeadType t);
         /// -------------------------------------------------
 
         /// ========= request: Method and uri ===============
@@ -96,15 +104,40 @@ namespace http
     private:
         eParseState consume(char c);
 
-        // TODO: parse engine.
-        struct parse_engine_node
+        /// parse engine.
+        enum class eNodeResult
         {
-
+            none,
+            method,
+            uri,
+            status,
+            ver_major,
+            ver_minor,
+            kv,
         };
 
-        eParseState state_;
+        struct parse_engine_node
+        {
+            eParseState state_;
+            eNodeResult result_;
+            const char* debuginfo_;
+            int save_[256];
+            parse_engine_node* next_[256];
+
+            explicit parse_engine_node(parse_engine_node* error_node, eParseState state = eParseState::indeterminate,
+                    eNodeResult result = eNodeResult::none);
+            void set_debuginfo(const char* s);
+            parse_engine_node* next(char c, std::string & buf, std::string & buf2);
+            void link(char c, parse_engine_node* node, int save = 1);
+            void link(const char* s, parse_engine_node* node, int save = 1);
+            static void create_list(const char* s, parse_engine_node* start, parse_engine_node* end, parse_engine_node* error_node, int save = 1);
+        };
+        parse_engine_node* parse_root();
+        static parse_engine_node* __init_parse_root();
+
         parse_engine_node* parse_node_;
         std::string parse_buf_;
+        std::string parse_buf2_;
 
     private:
         eHttpHeadType type_;
@@ -119,7 +152,6 @@ namespace http
         int version_major_;
         int version_minor_;
         ICaseMap fields_;
-        std::string error_;
     };
 
 } //namespace http
