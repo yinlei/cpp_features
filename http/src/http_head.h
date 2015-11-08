@@ -64,7 +64,7 @@ namespace http
         void set_type(eHttpHeadType t);
         /// -------------------------------------------------
 
-        /// ========= request: Method and uri ===============
+        /// ========= request: Method and path ===============
         enum class eMethod
         {
             Unkown = 0,
@@ -83,8 +83,8 @@ namespace http
         std::string method_s() const;
         void set_method_s(std::string s);
         
-        std::string uri() const;
-        void set_uri(std::string s);
+        std::string path() const;
+        void set_path(std::string s);
         /// =================================================
 
         /// ============ response: StatusCode ===============
@@ -120,7 +120,7 @@ namespace http
         {
             none,
             method,
-            uri,
+            path,
             status,
             ver_major,
             ver_minor,
@@ -155,7 +155,7 @@ namespace http
 
         // only request-type
         eMethod method_;
-        std::string uri_;
+        std::string path_;
 
         // only response-type
         int status_;

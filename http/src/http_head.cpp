@@ -13,7 +13,7 @@ namespace http
     {
         type_ = eHttpHeadType::indeterminate;
         method_ = eMethod::Unkown;
-        uri_.clear();
+        path_.clear();
         status_ = 0;
         version_major_ = 1;
         version_minor_ = 1;
@@ -70,7 +70,7 @@ namespace http
     {
         std::string s;
         if (type_ == eHttpHeadType::request)
-            s += method_s() + " " + uri() + " ";
+            s += method_s() + " " + path() + " ";
         else
             s += "STATUS " + std::to_string(status()) + " ";
         s += "HTTP/" + std::to_string(version_major()) + "." + std::to_string(version_minor());
@@ -83,7 +83,7 @@ namespace http
 
     /// -------------------------------------------------
 
-    /// ========= request: Method and uri ===============
+    /// ========= request: Method and path ===============
     http_head::eMethod http_head::method() const
     {
         return method_;
@@ -141,13 +141,13 @@ namespace http
         }
     }
 
-    std::string http_head::uri() const
+    std::string http_head::path() const
     {
-        return uri_;
+        return path_;
     }
-    void http_head::set_uri(std::string s)
+    void http_head::set_path(std::string s)
     {
-        uri_ = s;
+        path_ = s;
     }
     /// =================================================
 
@@ -237,8 +237,8 @@ namespace http
                         set_method_s(parse_buf_);
                         set_type(eHttpHeadType::request);
                         break;
-                    case eNodeResult::uri:
-                        set_uri(parse_buf_);
+                    case eNodeResult::path:
+                        set_path(parse_buf_);
                         break;
                     case eNodeResult::status:
                         set_status(atoi(parse_buf_.c_str()));
@@ -370,21 +370,21 @@ namespace http
         parse_engine_node::create_list("HEAD", root, method_end, err);
         parse_engine_node::create_list("OPTIONS", root, method_end, err);
 
-        // uri done
-        parse_engine_node *uri = new parse_engine_node(err, eParseState::indeterminate, eNodeResult::uri);
-        ENGINE_NODE_DEBUGGER(uri);
-        uri->link(" \t", uri, 0);
+        // path done
+        parse_engine_node *path = new parse_engine_node(err, eParseState::indeterminate, eNodeResult::path);
+        ENGINE_NODE_DEBUGGER(path);
+        path->link(" \t", path, 0);
         
-        parse_engine_node *uri_info = new parse_engine_node(err);
-        ENGINE_NODE_DEBUGGER(uri_info);
+        parse_engine_node *path_info = new parse_engine_node(err);
+        ENGINE_NODE_DEBUGGER(path_info);
         for (char c = 33; c < 127; ++c) {
-            uri_info->link(c, uri_info);
-            method->link(c, uri_info);
+            path_info->link(c, path_info);
+            method->link(c, path_info);
         }
         method->link(" \t", method, 0);
         method->link("\r\n", err, 0);
-        uri_info->link(" \t", uri, 0);
-        uri_info->link("\r\n", err, 0);
+        path_info->link(" \t", path, 0);
+        path_info->link("\r\n", err, 0);
 
         // STATUS
         parse_engine_node *status = new parse_engine_node(err);
@@ -422,7 +422,7 @@ namespace http
 
         // ---- HTTP/
         parse_engine_node::create_list("HTTP/", status_code, version_major_info, err, 0);
-        parse_engine_node::create_list("HTTP/", uri, version_major_info, err, 0);
+        parse_engine_node::create_list("HTTP/", path, version_major_info, err, 0);
 
         // ---- version major
         for (char c = '0'; c <= '9'; ++c) {

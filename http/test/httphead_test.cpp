@@ -23,7 +23,7 @@ TEST(HTTPHeadTest, simple)
         EXPECT_EQ(head.type(), http_head::eHttpHeadType::request);
 
         EXPECT_EQ(head.method(), http_head::eMethod::Post);
-        EXPECT_EQ(head.uri(), "/test/index.html");
+        EXPECT_EQ(head.path(), "/test/index.html");
         EXPECT_EQ(head.version_major(), 2);
         EXPECT_EQ(head.version_minor(), 0);
         EXPECT_EQ(head.content_length(), 32);
@@ -97,6 +97,10 @@ TEST(HTTPHeadTest, regex_bm)
         http_head head;
         boost::smatch result;
         boost::regex_match(request_head, result, re);
+        head.set_method_s(result[1].str());
+        head.set_path(result[2].str());
+        head.set_version_major(atoi(result[3].str().c_str()));
+        head.set_version_minor(atoi(result[4].str().c_str()));
         head.fields().insert(http_head::ICaseMap::value_type("ACCEPT", "ac"));
         head.fields().insert(http_head::ICaseMap::value_type("Content-Length", "32"));
         head.fields().insert(http_head::ICaseMap::value_type("Host", "www.baidu.com"));
