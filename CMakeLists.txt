@@ -30,3 +30,4 @@ install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/ DESTINATION "include/coroutin
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/linux/ DESTINATION "include/coroutine" FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/network")
+add_subdirectory("${PROJECT_SOURCE_DIR}/coroutine/main")
