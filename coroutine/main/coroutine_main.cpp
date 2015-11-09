@@ -1,13 +1,17 @@
 #include "coroutine.h"
 
-extern int co_main(int argc, char **argv);
+extern "C" int __coroutine_main_function(int argc, char **argv);
 
-int main(int argc, char **argv)
+__attribute__((weak)) int main(int argc, char **argv)
 {
+    co_chan<int> c(1);
+
     go [=]{
-        co_main(argc, argv);
+        c << __coroutine_main_function(argc, argv);
     };
 
     co_sched.RunUntilNoTask();
-    return 0;
+    int ret = 1;
+    c.TryPop(ret);
+    return ret;
 }

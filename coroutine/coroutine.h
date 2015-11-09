@@ -99,3 +99,5 @@ using ::co::co_timer_block_cancel;
 // co_await
 #define co_await(type) ::co::__async_wait<type>()-
 
+// co_main
+#define co_main(...) extern "C" int __coroutine_main_function(__VA_ARGS__)

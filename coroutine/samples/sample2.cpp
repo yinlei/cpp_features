@@ -4,7 +4,7 @@
 #include "coroutine.h"
 #include <stdio.h>
 
-int main()
+co_main(int argc, char **argv)
 {
     // 在协程中使用co_yield关键字, 可以主动让出调度器执行权限,
     // 让调度器有机会去执行其他协程,
@@ -38,7 +38,6 @@ int main()
         printf("4\n");
     };
 
-    co_sched.RunUntilNoTask();
     return 0;
 }
 
