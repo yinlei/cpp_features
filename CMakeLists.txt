@@ -26,7 +26,15 @@ set_target_properties("${SHARED_T}" PROPERTIES OUTPUT_NAME "${TARGET}")
 
 set(CMAKE_INSTALL_PREFIX "/usr/local")
 install(TARGETS ${STATIC_T} ${SHARED_T} LIBRARY DESTINATION "lib" ARCHIVE DESTINATION "lib")
-install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/ DESTINATION "include/coroutine" FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/ DESTINATION "include/coroutine"
+    FILES_MATCHING PATTERN "linux" EXCLUDE
+    PATTERN "benchmark" EXCLUDE
+    PATTERN "main" EXCLUDE
+    PATTERN "samples" EXCLUDE
+    PATTERN "test" EXCLUDE
+    PATTERN "unit_test" EXCLUDE
+    PATTERN "win_patch" EXCLUDE
+    PATTERN "*.h")
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/coroutine/linux/ DESTINATION "include/coroutine" FILES_MATCHING PATTERN "*.h")
 
 add_subdirectory("${PROJECT_SOURCE_DIR}/network")
