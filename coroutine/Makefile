@@ -30,8 +30,8 @@ clean:
 	rm *.o linux/*.o $(STATIC_LIB) $(DYNAMIC_LIB) -f
 
 install:
-	install -m 0664 $(STATIC_LIB) /usr/lib
-	install -m 0775 $(DYNAMIC_LIB) /usr/lib
-	mkdir -p /usr/include/coroutine
-	install -m 0664 *.h /usr/include/coroutine
-	install -m 0664 linux/*.h /usr/include/coroutine
+	install -m 0664 $(STATIC_LIB) /usr/local/lib
+	install -m 0775 $(DYNAMIC_LIB) /usr/local/lib
+	mkdir -p /usr/local/include/coroutine
+	install -m 0664 *.h /usr/local/include/coroutine
+	install -m 0664 linux/*.h /usr/local/include/coroutine
