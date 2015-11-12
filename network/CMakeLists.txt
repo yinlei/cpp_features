@@ -1,6 +1,7 @@
 ##################################################################################
 aux_source_directory(${PROJECT_SOURCE_DIR}/network NET_SRC_LIST)
 include_directories("${PROJECT_SOURCE_DIR}/network")
+include_directories("${PROJECT_SOURCE_DIR}")
 set(TARGET "network")
 add_library("${TARGET}" STATIC ${NET_SRC_LIST})
 
