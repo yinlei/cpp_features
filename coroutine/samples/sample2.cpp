@@ -21,11 +21,7 @@ co_main(int argc, char **argv)
     //   4
     //
     // 注意：1.在协程外使用co_yield不会有任何效果，也不会出错。
-    //       2.如果程序中还需要使用thread库，
-    //         头文件包含语句#include "coroutine.h"，要放到
-    //         标准库或boost库的thread.hpp的include之后，
-    //         以防由于macro的特性导致编译错误。
-    //       3.不要忘记co_yield语句后面的分号";", 如果忘记，也
+    //       2.不要忘记co_yield语句后面的分号";", 如果忘记，也
     //         没有太大关系，编译器一定会不太友好地提醒你。
     //
     go []{

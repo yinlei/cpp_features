@@ -19,7 +19,7 @@ coroutine是一个使用C++11编写的调度式stackful协程库,
 开发迅速且逻辑简洁，又有C++原生的性能优势，鱼和熊掌从此可以兼得。
 
 coroutine有以下特点：
- *   1.提供不输于golang的强大协程，基于corontine编写代码，可以以同步的方式编写简单的代码，同时获得异步的性能，
+ *   1.提供golang一般功能强大协程，基于corontine编写代码，可以以同步的方式编写简单的代码，同时获得异步的性能，
  *   2.支持海量协程, 创建100万个协程只需使用1GB内存
  *   3.允许用户自由控制协程调度点，随意变更调度线程数；
  *   4.支持多线程调度协程，极易编写并行代码，高效的并行调度算法，可以有效利用多个CPU核心
@@ -30,7 +30,7 @@ coroutine有以下特点：
  *   8.网络性能强劲，超越ASIO异步模型；尤其在处理小包和多线程并行方面非常强大。
  
  *   如果你发现了任何bug、有好的建议、或使用上有不明之处，可以提交到issue，也可以直接联系作者:
-      email:289633152@qq.com
+      email: 289633152@qq.com  QQ交流群: 296561497
 
  *   coroutine/samples目录下有很多示例代码，内含详细的使用说明，让用户可以循序渐进的学习coroutine库的使用方法。
 
@@ -46,13 +46,22 @@ coroutine有以下特点：
  
         0.如果你安装了ucorf，那么你已经安装过coroutine了，可以跳过第1步.
  
-        1.进入coroutine目录，执行make && sudo make install即可编译并安装完成.
+        1.使用CMake进行编译安装：
 
-        2.动态链接时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
+            $ mkdir build
+            $ cd build
+            $ cmake .. -DCMAKE_BUILD_TYPE=RELEASE
+            $ sudo make install
+
+          如果希望编译可调试的版本, 只需要cmake那行命令变为:
+
+            $ cmake ..
+
+        2.以动态链接的方式使用时，一定要最先链接libcoroutine.so，还需要链接libdl.so. 例如：
         
             g++ -std=c++11 test.cpp -lcoroutine -ldl [-lother_libs]
             
-        3.静态链接时，只需链接libcoroutine.a即可，不要求第一个被链接，但要求libc.a最后被链接. 例如:
+        3.以静态链接的方式使用时，只需链接libcoroutine.a即可，不要求第一个被链接，但要求libc.a最后被链接. 例如:
         
             g++ -std=c++11 test.cpp -lcoroutine -static -static-libgcc -static-libstdc++
 
@@ -73,9 +82,9 @@ coroutine有以下特点：
         4.使用时需要添加两个include目录：coroutine和coroutine/win_patch
 
 ##### 注意事项(WARNING)：
-     * 1.不能使用<线程局部变量>。使用多线程调度时，协程的每次切换，下一次继续执行都可能处于其他线程中
+     * 1.在多线程模式下不要使用<线程局部变量>。使用多线程调度时，协程的每次切换，下一次继续执行都可能处于其他线程中
      * 2.不要让一个代码段耗时过长。协程的调度是协作式调度，需要协程主动让出执行权，推荐在耗时很长的循环中插入一些yield
-     * 3.除网络IO、sleep以外的阻塞系统调用，会真正阻塞调度线程的运行，请使用channel+线程池的策略处理.
+     * 3.除网络IO、sleep以外的阻塞系统调用，会真正阻塞调度线程的运行，请使用co_await, 并启动几个线程去Run内置的线程池.
      * 4.协程栈上对象不可被协程外部访问。由于采用共享栈的方式调度协程，协程处于非执行状态时，
      栈上对象会被保存到另外一块内存中，因此会失效，此时通过保存的地址访问栈上对象是一种未定义行为。
      有共享需求的对象请将其置于堆上或使用channel。
