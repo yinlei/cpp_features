@@ -21,6 +21,6 @@ clean:
 	rm *.o $(STATIC_LIB) -f
 
 install:
-	install -m 0664 $(STATIC_LIB) /usr/lib
-	mkdir -p /usr/include/network
-	install -m 0664 *.h /usr/include/network
+	install -m 0664 $(STATIC_LIB) /usr/local/lib
+	mkdir -p /usr/local/include/network
+	install -m 0664 *.h /usr/local/include/network
