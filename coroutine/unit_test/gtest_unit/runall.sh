@@ -1,6 +1,6 @@
 #!/bin/sh
 
-make
+make $@
 ulimit -c 500000
 echo '' > result
 for t in `ls *.t`
