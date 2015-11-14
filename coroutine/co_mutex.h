@@ -8,7 +8,7 @@ namespace co
 /// 协程锁
 class CoMutex
 {
-    BlockObject block_;
+    mutable std::shared_ptr<BlockObject> block_;
 
 public:
     CoMutex();

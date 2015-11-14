@@ -23,7 +23,9 @@ int main(int argc, char** argv)
     // 使用以下代码将创建一个无缓冲区的、用于传递整数的Channel：
     co_chan<int> ch_0;
 
-    go [&ch_0]{
+    // Warnning: 不要在引用协程栈上的对象, 此处不可用&传参.
+    // channel是引用语义, 在协程间共享时要直接copy.
+    go [=]{
         // 在协程中, 向ch_0写入一个整数1.
         // 由于ch_0没有缓冲区, 因此会阻塞当前协程, 直到有人从ch_0中读取数据:
         ch_0 << 1;
@@ -46,7 +48,7 @@ int main(int argc, char** argv)
     // 创建缓冲区容量为1的Channel, 传递智能指针:
     co_chan<std::shared_ptr<int>> ch_1(1);
 
-    go [&] {
+    go [=] {
         std::shared_ptr<int> p1(new int(1));
 
         // 向ch_1中写入一个数据, 由于ch_1有一个缓冲区空位, 因此可以直接写入而不会阻塞当前协程.
@@ -56,7 +58,7 @@ int main(int argc, char** argv)
         ch_1 << p1;
     };
 
-    go [&] {
+    go [=] {
         std::shared_ptr<int> ptr;
 
         // 由于ch_1在执行前一个协程时被写入了一个元素, 因此下面这个读取数据的操作会立即完成.

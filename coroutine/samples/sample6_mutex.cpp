@@ -17,22 +17,22 @@
 #include <mutex>
 #include "coroutine.h"
 
+static int value = 0;
 
 int main()
 {
     co_mutex cm;
-    int value = 0;
     // 为展示co_mutex自动切换协程的功能，先锁住mutex
     cm.lock();
 
-    go [&]{
+    go [=] ()mutable {
         for (int i = 0; i < 3; ++i) {
             std::lock_guard<co_mutex> lock(cm);
             printf("%d\n", value++);
         }
     };
 
-    go [&]{
+    go [=] ()mutable {
         cm.unlock();
         for (int i = 0; i < 3; ++i) {
             std::lock_guard<co_mutex> lock(cm);

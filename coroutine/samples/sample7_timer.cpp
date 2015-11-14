@@ -15,13 +15,13 @@
 
 int main()
 {
-    bool is_exit = false;
+    bool *is_exit = new bool(false);
 
     // co_timer_add接受两个参数
     // 第一个参数可以是std::chrono中的时间长度，也可以是时间点。
     // 第二个参数是定时器回调函数
     // 返回一个co_timer_id类型的ID, 通过这个ID可以撤销还未执行的定时函数
-    co_timer_id id1 = co_timer_add(std::chrono::seconds(1), [&]{
+    co_timer_id id1 = co_timer_add(std::chrono::seconds(1), []{
             printf("Timer Callback.\n");
             });
 
@@ -33,9 +33,9 @@ int main()
     bool cancelled = co_timer_cancel(id1);
     printf("cancelled:%s\n", cancelled ? "true" : "false");
 
-    co_timer_add(std::chrono::seconds(2), [&]{
+    co_timer_add(std::chrono::seconds(2), [=]{
             printf("Timer Callback.\n");
-            is_exit = true;
+            *is_exit = true;
             });
 
     for (int i = 0; i < 100; ++i)
@@ -45,7 +45,7 @@ int main()
             co_sleep(1000);
         };
 
-    while (!is_exit)
+    while (!*is_exit)
         co_sched.Run();
     return 0;
 }

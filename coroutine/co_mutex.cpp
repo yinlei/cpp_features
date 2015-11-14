@@ -7,30 +7,29 @@ namespace co
 {
 
 CoMutex::CoMutex()
-    : block_(1)
+    : block_(new BlockObject(1))
 {
 }
 
 void CoMutex::lock()
 {
-    block_.CoBlockWait();
+    block_->CoBlockWait();
 }
 
 bool CoMutex::try_lock()
 {
-    return block_.TryBlockWait();
+    return block_->TryBlockWait();
 }
 
 bool CoMutex::is_lock()
 {
-    return block_.IsWakeup();
+    return block_->IsWakeup();
 }
 
 void CoMutex::unlock()
 {
-    if (!block_.Wakeup())
+    if (!block_->Wakeup())
         ThrowError(eCoErrorCode::ec_mutex_double_unlock);
 }
-
 
 } //namespace co
