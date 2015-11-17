@@ -7,7 +7,7 @@ namespace co
 {
 
 CoMutex::CoMutex()
-    : block_(new BlockObject(1))
+    : block_(new BlockObject(1, 1))
 {
 }
 
@@ -23,7 +23,7 @@ bool CoMutex::try_lock()
 
 bool CoMutex::is_lock()
 {
-    return block_->IsWakeup();
+    return !block_->IsWakeup();
 }
 
 void CoMutex::unlock()

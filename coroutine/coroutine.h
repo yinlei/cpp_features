@@ -2,6 +2,7 @@
 #include "scheduler.h"
 #include "channel.h"
 #include "thread_pool.h"
+#include "co_rwmutex.h"
 
 namespace co
 {
@@ -86,6 +87,11 @@ struct __async_wait<void>
 
 // co_mutex
 using ::co::co_mutex;
+
+// co_rwmutex
+using ::co::co_rwmutex;
+using ::co::co_rmutex;
+using ::co::co_wmutex;
 
 // co_chan
 using ::co::co_chan;
