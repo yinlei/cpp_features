@@ -39,8 +39,34 @@ int main()
             printf("%d\n", value++);
         }
     };
-
     co_sched.RunUntilNoTask();
+
+    // 读写锁
+    co_rwmutex m;
+
+    go [=]()mutable {
+        {
+            // 读锁
+            m.reader().lock();
+            m.reader().unlock();
+
+            // 或使用标准库提供的lock系列的工具
+            // 读锁视图的类型为：co_rmutex
+            std::unique_lock<co_rmutex> lock(m.reader());
+        }
+
+        {
+            // 写锁
+            m.writer().lock();
+            m.writer().unlock();
+
+            // 或使用标准库提供的lock系列的工具
+            // 写锁视图的类型为：co_wmutex
+            std::unique_lock<co_wmutex> lock(m.writer());
+        }
+    };
+    co_sched.RunUntilNoTask();
+
     return 0;
 }
 
