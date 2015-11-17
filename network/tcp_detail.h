@@ -75,6 +75,9 @@ private:
     co_mutex close_ec_mutex_;
     boost_ec close_ec_;
 
+    // debugger
+    std::atomic<int> chan_used_{0};
+
 public:
     tcp::endpoint local_addr_;
     tcp::endpoint remote_addr_;

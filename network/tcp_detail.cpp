@@ -21,8 +21,8 @@ namespace tcp_detail {
 
     TcpSession::~TcpSession()
     {
-        DebugPrint(dbg_session_alive, "TcpSession destruct %s:%d",
-                remote_addr_.address().to_string().c_str(), remote_addr_.port());
+        DebugPrint(dbg_session_alive, "TcpSession destruct %s:%d, chan_used_=%d",
+                remote_addr_.address().to_string().c_str(), remote_addr_.port(), (int)chan_used_);
     }
 
     void TcpSession::goStart()
@@ -251,14 +251,17 @@ namespace tcp_detail {
                     });
         }
 
+        chan_used_ = 1;
         if (!msg_chan_.TryPush(msg)) {
             if (msg->tid)
                 co_timer_cancel(msg->tid);
 
             if (cb)
                 cb(MakeNetworkErrorCode(eNetworkErrorCode::ec_send_overflow));
+            chan_used_ = 0;
             return ;
         }
+        chan_used_ = 0;
     }
     void TcpSession::Send(const void* data, size_t bytes, SndCb const& cb)
     {
