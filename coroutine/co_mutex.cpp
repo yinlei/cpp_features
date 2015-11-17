@@ -11,6 +11,10 @@ CoMutex::CoMutex()
 {
 }
 
+CoMutex::~CoMutex()
+{
+}
+
 void CoMutex::lock()
 {
     block_->CoBlockWait();

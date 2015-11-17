@@ -20,6 +20,9 @@ public:
     {
         impl_.reset(new ChannelImpl(capacity));
     }
+    ~Channel()
+    {
+    }
 
     template <typename U>
     Channel const& operator<<(U && t) const
@@ -235,6 +238,9 @@ public:
     explicit Channel(std::size_t capacity = 0)
     {
         impl_.reset(new ChannelImpl(capacity));
+    }
+    ~Channel()
+    {
     }
 
     Channel const& operator<<(nullptr_t ignore) const
